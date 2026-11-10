@@ -1,12 +1,16 @@
-# Novedades Contyme (demo)
+# Novedades Contyme (versión piloto)
 
 App web instalable (PWA) para que las **empresas clientes** envíen a Contyme las novedades de sus trabajadores del mes
 (horas extra, bonos, licencias con respaldo, vacaciones, ausencias, anticipos, ingresos, términos o «sin novedades»), y
 para que el equipo de **Remuneraciones** las revise y haga las liquidaciones.
 
-> **Es una demo.** Todos los datos son ficticios (empresas RUT 99.xxx.xxx, dominios `.demo`). El acceso, las claves y
-> los correos se **simulan en el navegador**: no hay servidor ni seguridad real. No poner aquí datos de clientes,
-> trabajadores, claves ni correos reales.
+> **Versión piloto, sin servidor.** Parte sin datos: Contyme habilita las empresas. Todo lo que se ingresa queda
+> guardado **solo en el navegador de cada dispositivo** (todavía no llega a Contyme) y el acceso se revisa en el
+> navegador, así que no es seguridad real. No ingresar aquí licencias médicas ni datos sensibles reales. La versión
+> real va en Remutyme (módulo «App»), con servidor y base de datos.
+>
+> Los correos de administrador no están escritos en el código: se guarda solo su huella SHA-256 (`ADMINS` en
+> `index.html`). Para agregar uno: `sha256("novedades-admin|" + correo en minúsculas)`.
 
 ## Qué hace
 
@@ -27,8 +31,9 @@ para que el equipo de **Remuneraciones** las revise y haga las liquidaciones.
 python -m http.server 8090
 ```
 
-Abrir http://localhost:8090. En la pantalla de ingreso, los botones «Para probar» llenan RUT y clave de ejemplo.
-«Soy de Contyme» abre la vista de administrador.
+Abrir http://localhost:8090. «Equipo Contyme» abre el ingreso de administradores (correo autorizado). En
+Administración → Empresas se habilitan con «RUT; nombre; correo de RRHH». Para volver a la demo con datos ficticios:
+`CONFIG.demo = true` y una semilla en `semilla()`.
 
 ## Archivos
 

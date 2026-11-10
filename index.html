@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Novedades Contyme</title>
-<meta name="description" content="Demo: las empresas envían a Contyme las novedades de sus trabajadores para las liquidaciones del mes.">
+<meta name="description" content="Las empresas envían a Contyme las novedades de sus trabajadores para las liquidaciones del mes.">
 <meta name="theme-color" content="#0F4C47">
 <meta name="robots" content="noindex, nofollow">
 <link rel="manifest" href="manifest.webmanifest">
@@ -262,7 +262,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
      endpoint futuro).
    ============================================================================= */
 const CONFIG = {
-  demo: true,                // false: oculta ayudas de prueba (chips, claves de demo, reinicio)
+  demo: false,               // true: muestra ayudas de prueba (chips, claves de demo, reinicio)
   periodo: { id: '2026-11', nombre: 'Noviembre 2026', mes: 'noviembre', plazo: '2026-11-25' },
   // PENDIENTE DE DECISIÓN (Contyme): 'clave-inicial' (clave genérica) o 'link' (link de un solo uso).
   // En la demo se puede cambiar en Administración → Ajustes para probar las dos.
@@ -275,12 +275,22 @@ const CONFIG = {
 };
 /* Solo para la demo. En producción nada de esto existe en el código del navegador. */
 const DEMO = {
-  claveInicial: 'Contyme2026',        // ficticia, solo demo
-  admin: 'admin@contyme.demo',        // cuenta ficticia
-  semillas: { '99000137-5': 'Tornillo2026', '99000396-3': 'Robles2026' } // claves ficticias de empresas de prueba
+  claveInicial: 'Contyme2026',        // clave inicial genérica (es pública: está en este código)
+  admin: 'administrador',
+  semillas: {}                        // sin empresas de prueba
 };
-const LS = 'novedades-contyme-demo-v4';
-const SS = 'novedades-contyme-sesion-v4';
+/* Correos con acceso de administrador. Se guarda solo su huella SHA-256 (con el prefijo «novedades-admin|»), así los
+   correos no quedan escritos en este código público. Para agregar uno: sha256('novedades-admin|' + correo en minúsculas). */
+const ADMINS = [
+  '9f3f2ae42c37ebd1368fed2355d5bf0a58dfcae40e0b3b39fec3941c153721f1',
+  '7f61ae9a61d95c089a7e7e57053110921bda30c4d9f29eafb98fbd25f4f4ff76'
+];
+async function esAdmin(correo) {
+  const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('novedades-admin|' + String(correo).trim().toLowerCase()));
+  return ADMINS.includes(aHex(new Uint8Array(b)));
+}
+const LS = 'novedades-contyme-v5';
+const SS = 'novedades-contyme-sesion-v5';
 const LS_TEMA = 'novedades-contyme-tema';
 
 const TIPOS = {
@@ -301,35 +311,13 @@ function semilla() {
   return {
     v: 4,
     ajustes: { activacion: CONFIG.activacion },
-    /* Simula el maestro de empresas de Remutyme. */
-    remutyme: {
-      '99000100-6': { nombre: 'Panadería Los Aromos SpA', cartera: 'Cartera 1', correoRrhh: 'rrhh@aromos.demo', trabajadores: ['Juan Pérez Soto', 'María González Lara', 'Pedro Rojas Muñoz', 'Camila Fuentes Díaz'] },
-      '99000137-5': { nombre: 'Ferretería El Tornillo Feliz Ltda.', cartera: 'Cartera 2', correoRrhh: 'rrhh@tornillo.demo', trabajadores: ['Luis Araya Vega', 'Daniela Torres Pino'] },
-      '99000211-8': { nombre: 'Colegio Particular Rayito de Sol SpA', cartera: 'Cartera 1', correoRrhh: 'rrhh@rayito.demo', trabajadores: ['Paula Morales Ríos', 'Andrés Silva Contreras', 'Francisca Núñez Leiva'] },
-      '99000396-3': { nombre: 'Agrícola Los Tres Robles Ltda.', cartera: 'Cartera 3', correoRrhh: 'rrhh@tres-robles.demo', trabajadores: ['Rodrigo Castro Bravo', 'Valentina Herrera Soto'] },
-      /* Están en Remutyme pero aún no habilitadas en la app (para probar la carga masiva). */
-      '99000500-1': { nombre: 'Transportes Cordillera Sur SpA', cartera: 'Cartera 2', correoRrhh: 'rrhh@cordillera.demo', trabajadores: ['Felipe Ortiz Lagos', 'Javiera Pinto Rivas'] },
-      '99000612-1': { nombre: 'Clínica Dental Sonrisa Ltda.', cartera: 'Cartera 3', correoRrhh: 'rrhh@sonrisa.demo', trabajadores: ['Constanza Vidal Mora', 'Ignacio Reyes Campos'] }
-    },
-    /* Cuentas de la app por RUT de empresa. Nunca se guarda una clave: solo huella PBKDF2 + sal. */
-    cuentas: {
-      '99000100-6': cuentaNueva(),
-      '99000137-5': Object.assign(cuentaNueva(), { correo: 'contacto@tornillo.demo' }),
-      '99000211-8': cuentaNueva(),
-      '99000396-3': Object.assign(cuentaNueva(), { correo: 'contacto@tres-robles.demo' })
-    },
-    meses: {
-      '99000100-6': Object.assign(mesVacio(), { novedades: [
-        { id: 1, trabajador: 'Juan Pérez Soto', tipo: 'Horas extra', datos: { horas: 6 }, comentario: '', adjunto: null, ejemplo: true },
-        { id: 2, trabajador: 'María González Lara', tipo: 'Licencia médica', datos: { desde: '2026-11-03', hasta: '2026-11-07' }, comentario: '', adjunto: { nombre: 'licencia-ejemplo.pdf', kb: 240, mime: 'application/pdf' }, ejemplo: true }
-      ] }),
-      '99000137-5': Object.assign(mesVacio(), { sinNovedades: true, enviado: '2026-11-06T13:20:00' }),
-      '99000211-8': mesVacio(),
-      '99000396-3': Object.assign(mesVacio(), { novedades: [{ id: 3, trabajador: 'Valentina Herrera Soto', tipo: 'Vacaciones', datos: { desde: '2026-11-17', hasta: '2026-11-21' }, comentario: '', adjunto: null, ejemplo: true }], enviado: '2026-11-07T10:05:00', revisado: true, ingresado: true })
-    },
+    /* Empresas (las crea Contyme en «Habilitar empresas»), cuentas de la app y novedades: todo parte en cero. */
+    remutyme: {},
+    cuentas: {},
+    meses: {},
     actividad: [],
     recordados: {},
-    siguienteId: 10
+    siguienteId: 1
   };
 }
 function cuentaNueva() { return { habilitada: true, hash: null, sal: null, correo: '', intentos: 0, pideReset: false, link: null }; }
@@ -506,6 +494,7 @@ const srv = {
         guardar(); return { ok: true, id: idEditar };
       }
       const id = s.siguienteId++;
+      if (limpia.trabajadorNuevo && limpia.trabajador && !lista.includes(limpia.trabajador)) lista.push(limpia.trabajador);
       m.novedades.push(Object.assign({ id, creada: ahora() }, limpia)); m.sinNovedades = false;
       guardar(); return { ok: true, id };
     },
@@ -576,15 +565,22 @@ const srv = {
         const rut = normRut(celda);
         if (!rut || !dvValido(rut)) { r.malos.push('Línea ' + (i + 1) + ': «' + celda.slice(0, 30) + '» no es un RUT válido.'); return; }
         if (vistos.has(rut)) { r.repetidos = (r.repetidos || 0) + 1; return; } vistos.add(rut);
-        if (!s.remutyme[rut]) { r.malos.push('Línea ' + (i + 1) + ': ' + rutBonito(rut) + ' no está en Remutyme.'); return; }
+        if (!s.remutyme[rut]) {
+          const nombre = celdas.find(x => x && x !== celda && /[a-záéíóúñ]/i.test(x) && !RE_CORREO.test(x));
+          const correoRrhh = (celdas.find(x => RE_CORREO.test(x)) || '').toLowerCase();
+          if (!nombre) { r.malos.push('Línea ' + (i + 1) + ': ' + rutBonito(rut) + ' es nueva y falta el nombre de la empresa (RUT; nombre).'); return; }
+          r.datos = r.datos || {}; r.datos[rut] = { nombre: nombre.slice(0, 120), correoRrhh };
+          r.nuevas.push(rut); return;
+        }
         const c = s.cuentas[rut];
         if (c && c.habilitada) r.ya.push(rut); else r.nuevas.push(rut);
       });
       return r;
     },
-    aplicarCarga(ruts) {
+    aplicarCarga(ruts, datos) {
       soyAdmin(); let n = 0;
       ruts.forEach(rut => {
+        if (!s.remutyme[rut] && datos && datos[rut]) s.remutyme[rut] = { nombre: datos[rut].nombre, cartera: 'Sin cartera', correoRrhh: datos[rut].correoRrhh, trabajadores: [] };
         if (!s.remutyme[rut]) return;
         if (s.cuentas[rut]) s.cuentas[rut].habilitada = true; else s.cuentas[rut] = cuentaNueva();
         if (!s.meses[rut]) s.meses[rut] = { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null };
@@ -660,11 +656,11 @@ function vistaLogin() {
       (ui.aviso ? '<div class="nota nota-info" role="status">' + esc(ui.aviso) + '</div>' : '<button type="submit" class="btn btn-pri">Avisar a Contyme</button>') +
       '<button type="button" class="btn-link" data-a="paso" data-v="rut">Volver al ingreso</button></form>';
   } else if (ui.paso === 'contyme') {
-    cuerpo = '<div class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Equipo Contyme</h2>' +
-      '<p class="sub">Los administradores entran con su cuenta de Google de Contyme, igual que en Remutyme. En la versión real esta pantalla vive dentro de Remutyme y no se publica en la app de los clientes.</p>' +
-      '<button type="button" class="btn btn-pri" data-a="entrar-admin">Entrar con Google (simulado)</button>' +
-      (CONFIG.demo ? '<p class="sub">En la demo entras como <b>' + esc(DEMO.admin) + '</b>, sin verificar nada.</p>' : '') +
-      '<button type="button" class="btn-link" data-a="paso" data-v="rut">Volver al ingreso de empresas</button></div>';
+    cuerpo = '<form id="f-admin" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Equipo Contyme</h2>' +
+      '<p class="sub">Solo para administradores de Contyme. Ingresa tu correo de Contyme.</p>' +
+      input('a-correo', 'Correo', { type: 'email', ac: 'email', im: 'email', ph: 'nombre@contyme.cl' }) + errorGeneral() +
+      '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>Entrar</button>' +
+      '<button type="button" class="btn-link" data-a="paso" data-v="rut">Volver al ingreso de empresas</button></form>';
   } else {
     const ayudaClave = modo() === 'link' ? '¿Primera vez? Abre el link que te llegó por correo y crea ahí tu clave.' : '¿Primera vez? Usa la clave inicial que te entregó Contyme.';
     let demo = '';
@@ -759,9 +755,10 @@ function cliNueva(d) {
   if (def) {
     let n = 2;
     if (!def.sinTrabajador) {
-      html += '<fieldset><legend><span class="num" aria-hidden="true">' + (n++) + '</span>¿A quién?</legend>' +
-        select('trabajador', 'Trabajador', d.trabajadores.map(x => [x, x]).concat([['__otro', 'Otro (no está en la lista)']]), { vacia: 'Elige un trabajador' }) +
-        (val('trabajador') === '__otro' ? '<div style="margin-top:10px">' + input('trab-otro', 'Nombre del trabajador', { ph: 'Nombre y apellido', max: 120, ayuda: 'Contyme lo revisa porque no aparece en tu nómina.' }) + '</div>' : '') + '</fieldset>';
+      if (!d.trabajadores.length) ui.form.trabajador = '__otro';
+      html += '<fieldset><legend><span class="num" aria-hidden="true">' + (n++) + '</span>¿A quién?</legend>' + (!d.trabajadores.length ? input('trab-otro', 'Nombre del trabajador', { ph: 'Nombre y apellido', max: 120, ayuda: 'Quedará en tu lista para la próxima vez.' }) + '</fieldset>' : '') +
+        (!d.trabajadores.length ? '' : select('trabajador', 'Trabajador', d.trabajadores.map(x => [x, x]).concat([['__otro', 'Otro (no está en la lista)']]), { vacia: 'Elige un trabajador' }) +
+        (val('trabajador') === '__otro' ? '<div style="margin-top:10px">' + input('trab-otro', 'Nombre del trabajador', { ph: 'Nombre y apellido', max: 120, ayuda: 'Quedará en tu lista para la próxima vez.' }) + '</div>' : '') + '</fieldset>');
     }
     const campos = def.campos.map(c => campoTipo(c));
     const fechas = def.campos.length === 2 && def.campos.every(c => c.t === 'fecha');
@@ -891,7 +888,7 @@ function admEmpresas() {
   else if (ui.carga) {
     const k = ui.carga;
     res = '<div class="resultado" role="status"><b>Revisión de la lista</b>' +
-      (k.nuevas.length ? '<div>' + (k.nuevas.length === 1 ? 'Se habilitará 1 empresa' : 'Se habilitarán ' + k.nuevas.length + ' empresas') + ':<ul>' + k.nuevas.map(r => '<li>' + esc(s.remutyme[r].nombre) + ' <span class="mono">(' + rutBonito(r) + ')</span></li>').join('') + '</ul></div>' : '<div>No hay empresas nuevas para habilitar.</div>') +
+      (k.nuevas.length ? '<div>' + (k.nuevas.length === 1 ? 'Se habilitará 1 empresa' : 'Se habilitarán ' + k.nuevas.length + ' empresas') + ':<ul>' + k.nuevas.map(r => '<li>' + esc(s.remutyme[r] ? s.remutyme[r].nombre : k.datos[r].nombre + ' (nueva)') + ' <span class="mono">(' + rutBonito(r) + ')</span></li>').join('') + '</ul></div>' : '<div>No hay empresas nuevas para habilitar.</div>') +
       (k.repetidos ? '<div class="sub">' + plural(k.repetidos, 'RUT repetido en la lista (se cuenta una vez)', 'RUT repetidos en la lista (se cuentan una vez)') + '.</div>' : '') +
       (k.ya.length ? '<div class="sub">' + plural(k.ya.length, 'ya estaba habilitada', 'ya estaban habilitadas') + '.</div>' : '') +
       (k.malos.length ? '<div class="malos">Con problemas (no se habilitan):<ul>' + k.malos.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
@@ -903,8 +900,8 @@ function admEmpresas() {
     '<p class="sub">Solo estos RUT pueden entrar. ' + (lnk ? 'Modo <b>link de un solo uso</b>: cada empresa recibe un link personal que vence en ' + CONFIG.horasLink + ' h para crear su clave. «Restablecer clave» manda un link nuevo.' : 'Modo <b>clave inicial</b>: la primera vez entran con la clave inicial y crean una propia. «Restablecer clave» la devuelve a la inicial.') + ' Nunca dictes ni mandes claves por correo o mensaje.</p>' +
     '<div class="dos"><div class="ancho tabla-caja"><table class="tabla-resp"><caption class="sr">Cuentas de empresas en la app</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Acceso</th><th scope="col">Correo de contacto</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
     '<div class="angosto"><form id="f-masiva" class="caja" novalidate><h2 style="font-size:17px">Habilitar empresas (masivo)</h2>' +
-    '<p class="sub">Un RUT por línea: pega la columna de RUT desde Excel o sube un CSV (se toma la primera columna con números). Solo se habilitan empresas que ya están en Remutyme. Antes de habilitar te mostramos qué va a pasar.</p>' +
-    '<div class="campo"><label for="masiva">RUT de las empresas</label><textarea id="masiva" rows="6" placeholder="99.000.500-1&#10;99.000.612-1"' + aria('masiva') + '>' + esc(val('masiva')) + '</textarea>' + pieCampo('masiva') + '</div>' +
+    '<p class="sub">Una empresa por línea: <b>RUT; nombre de la empresa; correo de RRHH</b> (el correo es opcional). Sirve pegar las columnas desde Excel o subir un CSV. Antes de habilitar te mostramos qué va a pasar.</p>' +
+    '<div class="campo"><label for="masiva">Empresas</label><textarea id="masiva" rows="6" placeholder="RUT; Nombre de la empresa; correo"' + aria('masiva') + '>' + esc(val('masiva')) + '</textarea>' + pieCampo('masiva') + '</div>' +
     '<div class="campo"><label for="masiva-archivo">O sube un archivo CSV</label><input id="masiva-archivo" type="file" accept=".csv,.txt,text/csv,text/plain"></div>' +
     res + (ui.carga && ui.carga.listo == null ? '' : '<button type="submit" class="btn btn-pri">Revisar lista</button>') + '</form></div></div>';
 }
@@ -968,7 +965,8 @@ function pintar() {
   let rango = null; try { if (act && act.selectionStart != null) rango = [act.selectionStart, act.selectionEnd]; } catch (e) {}
   document.body.classList.toggle('es-admin', !!(sesion && sesion.rol === 'admin'));
   $('raiz').innerHTML = !sesion ? vistaLogin() : sesion.rol === 'admin' ? vistaAdmin() : vistaCliente();
-  $('demo-barra').innerHTML = CONFIG.demo ? '<div class="demo-barra gutter" role="note"><span>DEMO · datos ficticios · el acceso y los correos son simulados</span><button type="button" data-a="que-simulado">¿Qué es simulado?</button></div>' : '';
+  $('demo-barra').innerHTML = CONFIG.demo ? '<div class="demo-barra gutter" role="note"><span>DEMO · datos ficticios · el acceso y los correos son simulados</span><button type="button" data-a="que-simulado">¿Qué es simulado?</button></div>'
+    : '<div class="demo-barra gutter" role="note"><span>Versión piloto · lo que ingreses queda guardado solo en este dispositivo</span><button type="button" data-a="que-simulado">Más info</button></div>';
   let destino = null;
   if (ui.foco) { destino = document.querySelector(ui.foco.charAt(0) === '[' ? ui.foco : '#' + ui.foco); ui.foco = null; }
   else if (sel) { destino = document.querySelector(sel); if (destino === act) destino = null; }
@@ -1056,11 +1054,11 @@ function copiar(texto) {
 
 /* ---------- Acciones (clic) ---------- */
 const ACC = {
-  'que-simulado': () => dialogo({ titulo: 'Qué es simulado en esta demo', cancelar: 'Entendido', html: '<ul>' +
+  'que-simulado': () => dialogo({ titulo: CONFIG.demo ? 'Qué es simulado en esta demo' : 'Sobre esta versión piloto', cancelar: 'Entendido', html: '<ul>' +
     '<li><b>El acceso.</b> RUT, claves e intentos se revisan en este navegador. Cualquiera con el código puede saltárselo: no es seguridad real. En la versión real lo hace el servidor de Remutyme.</li>' +
-    '<li><b>Los datos.</b> Son ficticios y quedan solo en este navegador.</li>' +
+    '<li><b>Los datos.</b> ' + (CONFIG.demo ? 'Son ficticios y quedan' : 'Quedan') + ' solo en este navegador: todavía no se envían a un servidor de Contyme.</li>' +
     '<li><b>Los correos.</b> No se manda ninguno; se anotan en Administración → Actividad.</li>' +
-    '<li><b>Google de Contyme.</b> El botón entra directo como administrador de prueba.</li>' +
+    '<li><b>Administradores.</b> Entran con un correo autorizado de Contyme; la verificación real (Google) llega con la versión en Remutyme.</li>' +
     '<li><b>Los archivos.</b> No salen de esta pestaña y se borran al cerrar sesión o recargar.</li></ul>' }),
   paso: v => { ui.paso = v; ui.err = null; ui.aviso = ''; if (v === 'olvide') ui.form = { 'o-rut': val('rut') }; else if (v !== 'rut') ui.form = {}; ui.foco = 'titulo'; pintar(); },
   'demo-fill': v => {
@@ -1069,7 +1067,6 @@ const ACC = {
     ui.foco = '[data-a="demo-fill"][data-v="' + v + '"]'; pintar(); toast('Listo: toca «Entrar»');
   },
   'demo-link': v => { const c = s.cuentas[v]; if (!c) return; if (c.hash) { toast('Esa empresa ya tiene clave. Restablécela desde Administración.'); return; } if (!c.link) { crearLink(v); guardar(); } abrirLinkDemo(c.link.token); },
-  'entrar-admin': () => { entrar({ rol: 'admin', correo: DEMO.admin }, 'Hola, administrador (simulado)'); registrar(null, 'seguridad', 'Ingreso de administrador (simulado): ' + DEMO.admin + '.'); guardar(); },
   ver: (v, b) => { const i = $(v); if (!i) return; const mostrar = i.type === 'password'; i.type = mostrar ? 'text' : 'password'; b.textContent = mostrar ? 'Ocultar' : 'Mostrar'; b.setAttribute('aria-pressed', String(mostrar)); b.setAttribute('aria-label', mostrar ? 'Ocultar la clave' : 'Mostrar la clave'); },
   salir: () => cerrarSesion('Cerraste la sesión.'),
   tab: v => ir(v, v === ui.tab && v === 'nueva'),
@@ -1146,7 +1143,7 @@ const ACC = {
     dialogo({ titulo: '¿Bloquear el acceso de ' + nom + '?', ok: 'Bloquear', peligro: true, html: '<p>No podrá entrar a la app hasta que la vuelvas a habilitar. Sus datos se mantienen.</p>',
       accion: () => { srv.adm.alternarBloqueo(v); pintar(); toast(nom + ': acceso bloqueado'); } });
   },
-  'aplicar-carga': () => { const n = srv.adm.aplicarCarga(ui.carga.nuevas); ui.carga = { listo: n }; ui.form.masiva = ''; pintar(); toast(plural(n, 'empresa habilitada', 'empresas habilitadas')); },
+  'aplicar-carga': () => { const n = srv.adm.aplicarCarga(ui.carga.nuevas, ui.carga.datos); ui.carga = { listo: n }; ui.form.masiva = ''; pintar(); toast(plural(n, 'empresa habilitada', 'empresas habilitadas')); },
   'cancelar-carga': () => { ui.carga = null; ui.foco = 'masiva'; pintar(); },
   'act-filtro': v => { ui.actFiltro = v; pintar(); },
   activacion: v => { srv.adm.cambiarActivacion(v); pintar(); toast('Modo de la demo: ' + (v === 'link' ? 'link de un solo uso' : 'clave inicial')); },
@@ -1241,6 +1238,17 @@ function leerCampos(tipo) {
   return { datos };
 }
 const SUB = {
+  'f-admin': async () => {
+    if (ui.cargando) return;
+    const correo = String(val('a-correo')).trim().toLowerCase();
+    if (!RE_CORREO.test(correo)) return falla('a-correo', 'Escribe tu correo de Contyme.');
+    ui.cargando = true; pintar();
+    let ok = false; try { ok = await esAdmin(correo); } catch (e) { ok = false; }
+    ui.cargando = false;
+    if (!ok) { ui.err = { msg: 'Este correo no tiene acceso de administrador.' }; ui.foco = 'a-correo'; pintar(); return; }
+    entrar({ rol: 'admin', correo }, 'Hola, ' + correo.split('@')[0]);
+    registrar(null, 'seguridad', 'Ingreso de administrador: ' + correo + '.'); guardar();
+  },
   'f-ingreso': async () => {
     if (ui.cargando) return;
     const rutTxt = val('rut'), clave = val('clave');
