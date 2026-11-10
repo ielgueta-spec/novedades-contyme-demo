@@ -4,13 +4,15 @@ App web instalable (PWA) para que las **empresas clientes** envíen a Contyme la
 (horas extra, bonos, licencias con respaldo, vacaciones, ausencias, anticipos, ingresos, términos o «sin novedades»), y
 para que el equipo de **Remuneraciones** las revise y haga las liquidaciones.
 
-> **Versión piloto, sin servidor.** Parte sin datos: Contyme habilita las empresas. Todo lo que se ingresa queda
-> guardado **solo en el navegador de cada dispositivo** (todavía no llega a Contyme) y el acceso se revisa en el
-> navegador, así que no es seguridad real. No ingresar aquí licencias médicas ni datos sensibles reales. La versión
-> real va en Remutyme (módulo «App»), con servidor y base de datos.
+> **Versión piloto.** Parte sin datos: Contyme habilita las empresas.
+> - **Con servidor** (`CONFIG.servidor` = URL de Google Apps Script, ver [`servidor/INSTALAR.md`](servidor/INSTALAR.md)):
+>   los envíos se guardan en una Google Sheet de Contyme, los respaldos en una carpeta privada de Drive y le llega un
+>   correo a la encargada de cada empresa. Las claves se revisan en el servidor y los administradores entran con un
+>   código que llega a su correo.
+> - **Sin servidor** (`CONFIG.servidor` vacío): todo queda en el navegador de cada dispositivo; sirve solo para probar.
 >
-> Los correos de administrador no están escritos en el código: se guarda solo su huella SHA-256 (`ADMINS` en
-> `index.html`). Para agregar uno: `sha256("novedades-admin|" + correo en minúsculas)`.
+> Nada sensible va en el código: la clave inicial y los administradores están en las propiedades del script. En
+> modo sin servidor, los correos de administrador están solo como huella SHA-256 (`ADMINS` en `index.html`).
 
 ## Qué hace
 

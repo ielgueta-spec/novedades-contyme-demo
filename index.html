@@ -262,6 +262,9 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
      endpoint futuro).
    ============================================================================= */
 const CONFIG = {
+  /* Dirección del servidor (Google Apps Script publicado como app web, ver servidor/INSTALAR.md).
+     Vacío = todo queda en este dispositivo (modo local, sirve para probar sin servidor). */
+  servidor: '',
   demo: false,               // true: muestra ayudas de prueba (chips, claves de demo, reinicio)
   periodo: { id: '2026-11', nombre: 'Noviembre 2026', mes: 'noviembre', plazo: '2026-11-25' },
   // PENDIENTE DE DECISIÓN (Contyme): 'clave-inicial' (clave genérica) o 'link' (link de un solo uso).
@@ -288,6 +291,50 @@ const ADMINS = [
 async function esAdmin(correo) {
   const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode('novedades-admin|' + String(correo).trim().toLowerCase()));
   return ADMINS.includes(aHex(new Uint8Array(b)));
+}
+const REMOTO = !!CONFIG.servidor;
+const SIM = REMOTO ? '' : ' (simulado)';
+/* Llama al servidor. Content-Type text/plain para que el navegador no haga la consulta previa (CORS) que Apps Script no responde. */
+async function api(accion, datos) {
+  try {
+    const r = await fetch(CONFIG.servidor, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ accion, token: sesion && sesion.token, periodo: CONFIG.periodo.id }, datos || {})) });
+    const j = await r.json();
+    if (j && j.salir && sesion) { cerrarSesion(j.error || 'Tu sesión venció. Vuelve a entrar.'); }
+    return j || { error: 'Respuesta vacía del servidor.' };
+  } catch (e) { return { error: 'No hay conexión con Contyme. Revisa tu internet e intenta de nuevo.' }; }
+}
+const archivosMem = new Map(); // id de novedad → archivo (para subirlo al enviar)
+function aBase64(f) { return new Promise((ok, mal) => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.onerror = mal; r.readAsDataURL(f); }); }
+/* Copia en este dispositivo lo que el servidor dice de la empresa (y conserva el borrador si no ha enviado). */
+function cargarCliente(d) {
+  if (!d) return;
+  const previo = s.remutyme[d.rut];
+  s.remutyme[d.rut] = { nombre: d.nombre, cartera: '', correoRrhh: '', trabajadores: Array.from(new Set((d.trabajadores || []).concat(previo ? previo.trabajadores : []))) };
+  s.cuentas[d.rut] = Object.assign(cuentaNueva(), { hash: 'servidor', correo: d.contacto || '' });
+  const local = s.meses[d.rut] || { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null };
+  const m = d.mes || {};
+  if (m.enviado) s.meses[d.rut] = { novedades: (m.novedades || []).map((n, i) => Object.assign({ id: 'e' + i }, n)), sinNovedades: !!m.sinNovedades, enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, nota: null };
+  else s.meses[d.rut] = Object.assign(local, { enviado: null, revisado: false, ingresado: false, nota: m.nota || local.nota || null });
+  guardar();
+}
+async function cargarAdmin() {
+  const r = await api('adm-datos');
+  if (r.error) { if (sesion) toast(r.error); return false; }
+  s.remutyme = {}; s.cuentas = {}; s.meses = {};
+  r.empresas.forEach(e => {
+    s.remutyme[e.rut] = { nombre: e.nombre, cartera: e.correoEncargada || 'Sin encargada', correoRrhh: e.correoEncargada, trabajadores: e.trabajadores };
+    s.cuentas[e.rut] = Object.assign(cuentaNueva(), { habilitada: e.habilitada, hash: e.registrada ? 'servidor' : null, correo: e.contacto, intentos: e.intentos, pideReset: e.pideReset });
+    const m = r.meses[e.rut];
+    s.meses[e.rut] = m && m.enviado ? { novedades: m.novedades.map((n, i) => Object.assign({ id: e.rut + '-' + i }, n)), sinNovedades: m.sinNovedades, enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, nota: null, carpeta: m.carpeta }
+      : { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: m ? m.nota : null };
+  });
+  s.actividad = r.actividad || [];
+  guardar(); return true;
+}
+/* Acción de administrador en el servidor; después vuelve a leer todo para quedar igual que el servidor. */
+function remoto(accion, datos) {
+  if (!REMOTO) return;
+  api(accion, datos).then(r => { if (r.error) toast(r.error); return cargarAdmin(); }).then(() => { if (sesion) pintar(); });
 }
 const LS = 'novedades-contyme-v5';
 const SS = 'novedades-contyme-sesion-v5';
@@ -375,7 +422,7 @@ let s = leerLS(LS);
 if (!s || s.v !== 4) s = semilla();
 const guardar = () => { if (!escribirLS(LS, s)) toast('No se pudo guardar en este navegador. La demo funciona, pero se perderá al recargar.'); };
 function registrar(rut, tipo, txt) { s.actividad.push({ t: ahora(), rut: rut || null, tipo, txt }); if (s.actividad.length > 300) s.actividad = s.actividad.slice(-300); }
-function modo() { return s.ajustes.activacion; }
+function modo() { return REMOTO ? 'clave-inicial' : s.ajustes.activacion; }
 
 /* Convierte las claves ficticias de las empresas de prueba en huellas (una vez). */
 async function prepararSemillas() {
@@ -417,6 +464,12 @@ const srv = {
   /* --- Acceso de empresas (públicos) --- */
   async ingresar(rutTxt, clave) {
     await listo;
+    if (REMOTO) {
+      const r = await api('ingresar', { rut: rutTxt, clave });
+      if (r.ok) { cargarCliente(r.datos); return { ok: true, rut: r.rut, token: r.token }; }
+      if (r.paso === 'crear') tickets.set(r.ticket, { rut: r.rut, remoto: true, vence: Date.now() + 10 * 60e3 });
+      return r;
+    }
     const rut = normRut(rutTxt);
     if (!rut || !dvValido(rut)) return { campo: 'rut', error: 'Revisa el RUT: falta un número o el dígito verificador no calza.' };
     if (!clave) return { campo: 'clave', error: 'Escribe la clave.' };
@@ -452,6 +505,12 @@ const srv = {
   async crearClave(ticket, nueva, repite, correo) {
     const t = tickets.get(ticket);
     if (!t || t.vence < Date.now()) return { error: 'Pasó mucho rato. Vuelve a empezar el ingreso.', reiniciar: true };
+    if (t.remoto) {
+      if (nueva !== repite) return { campo: 'repite', error: 'Las dos claves no son iguales.' };
+      const r = await api('crear-clave', { ticket, nueva, correo });
+      if (r.ok) { tickets.delete(ticket); cargarCliente(r.datos); return { ok: true, rut: r.rut, token: r.token }; }
+      return r;
+    }
     const rut = t.rut, c = s.cuentas[rut], nom = s.remutyme[rut].nombre;
     const debil = [DEMO.claveInicial, 'contyme', '12345678', 'password', 'qwerty', rut.split('-')[0]].map(x => x.toLowerCase());
     if (nueva.length < CONFIG.claveMin) return { campo: 'nueva', error: 'La clave debe tener al menos ' + CONFIG.claveMin + ' caracteres.' };
@@ -469,6 +528,7 @@ const srv = {
   pedirRestablecer(rutTxt) {
     const rut = normRut(rutTxt);
     if (!rut || !dvValido(rut)) return { campo: 'o-rut', error: 'Revisa el RUT: falta un número o el dígito verificador no calza.' };
+    if (REMOTO) { api('pedir-restablecer', { rut }); return { ok: true }; }
     const c = s.cuentas[rut];
     if (c && s.remutyme[rut] && !c.pideReset) { c.pideReset = true; registrar(rut, 'correo', 'Aviso a la encargada de ' + s.remutyme[rut].cartera + ': ' + s.remutyme[rut].nombre + ' pidió restablecer su clave.'); guardar(); }
     /* Misma respuesta siempre: no revela si el RUT es cliente de Contyme. */
@@ -505,10 +565,23 @@ const srv = {
     },
     restaurar(n, i) { const m = s.meses[soyCliente()]; if (m.enviado) return; m.novedades.splice(Math.min(i, m.novedades.length), 0, n); m.sinNovedades = false; guardar(); },
     sinNovedades(v) { const m = s.meses[soyCliente()]; if (m.enviado || m.novedades.length) return; m.sinNovedades = v; guardar(); },
-    enviar() {
+    async enviar() {
       const rut = soyCliente(), m = s.meses[rut], e = s.remutyme[rut], c = s.cuentas[rut];
       if (m.enviado) return { error: 'Ya estaba enviado.' };
       if (!m.novedades.length && !m.sinNovedades) return { error: 'Agrega una novedad o marca que no hubo novedades.' };
+      if (REMOTO) {
+        const sinArchivo = m.novedades.filter(n => n.adjunto && !archivosMem.has(n.id));
+        if (sinArchivo.length) return { error: 'Vuelve a adjuntar el respaldo de ' + sinArchivo.map(n => n.trabajador).join(', ') + ' (se pierde al cerrar la app). Toca la novedad → Editar.' };
+        const archivos = [];
+        for (let i = 0; i < m.novedades.length; i++) {
+          const f = archivosMem.get(m.novedades[i].id);
+          if (f) archivos.push({ idx: i, nombre: m.novedades[i].adjunto.nombre, mime: m.novedades[i].adjunto.mime, base64: await aBase64(f) });
+        }
+        const lista = m.novedades.map(n => ({ trabajador: n.trabajador, tipo: n.tipo, detalle: detalle(n), comentario: n.comentario, datos: n.datos, adjunto: n.adjunto ? { nombre: n.adjunto.nombre } : null, trabajadorNuevo: !!n.trabajadorNuevo }));
+        const r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos });
+        if (r.error) return r;
+        archivosMem.clear(); cargarCliente(r.datos); return { ok: true };
+      }
       m.enviado = ahora(); m.revisado = false; m.ingresado = false; m.nota = null;
       const cuantas = m.novedades.length ? plural(m.novedades.length, 'novedad', 'novedades') : 'sin novedades';
       registrar(rut, 'accion', e.nombre + ' envió ' + cuantas + ' de ' + CONFIG.periodo.mes + ' a la bandeja de RRHH.');
@@ -523,12 +596,14 @@ const srv = {
     empresas() { soyAdmin(); return Object.keys(s.cuentas).filter(r => s.remutyme[r]); },
     recordar(rut) {
       soyAdmin(); const m = s.meses[rut]; if (!m || m.enviado) return;
+      remoto('adm-recordar', { rut, plazo: fmtCorta(CONFIG.periodo.plazo) });
       s.recordados[rut] = ahora();
       registrar(rut, 'correo', 'Recordatorio a ' + s.remutyme[rut].nombre + ' (' + (s.cuentas[rut].correo || s.remutyme[rut].correoRrhh) + '): «Recuerda enviar tus novedades de ' + CONFIG.periodo.mes + ' antes del ' + fmtCorta(CONFIG.periodo.plazo) + '».');
       guardar();
     },
     marcar(rut, estado) {
       soyAdmin(); const m = s.meses[rut]; if (!m || !m.enviado) return;
+      remoto('adm-marcar', { rut, estado });
       if (estado === 'revisada') { m.revisado = true; m.ingresado = false; }
       else if (estado === 'ingresada') { m.revisado = true; m.ingresado = true; }
       else { m.revisado = false; m.ingresado = false; }
@@ -537,12 +612,14 @@ const srv = {
     },
     reabrir(rut, nota) {
       soyAdmin(); const m = s.meses[rut]; if (!m || !m.enviado) return;
+      remoto('adm-reabrir', { rut, nota });
       m.enviado = null; m.revisado = false; m.ingresado = false; m.nota = nota;
       registrar(rut, 'correo', 'A ' + s.remutyme[rut].nombre + ': «Contyme te pidió revisar tus novedades: ' + nota + '».');
       guardar();
     },
     restablecer(rut) {
       soyAdmin(); const c = s.cuentas[rut]; if (!c) return;
+      remoto('adm-restablecer', { rut });
       c.hash = null; c.sal = null; c.intentos = 0; c.pideReset = false; c.link = null;
       registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': clave restablecida por Contyme.');
       if (modo() === 'link') crearLink(rut);
@@ -551,6 +628,7 @@ const srv = {
     enviarLink(rut) { soyAdmin(); const c = s.cuentas[rut]; if (!c || c.hash) return; crearLink(rut); guardar(); },
     alternarBloqueo(rut) {
       soyAdmin(); const c = s.cuentas[rut]; c.habilitada = !c.habilitada;
+      remoto('adm-bloqueo', { rut, habilitada: c.habilitada });
       registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': acceso ' + (c.habilitada ? 'habilitado' : 'bloqueado') + ' por Contyme.');
       guardar(); return c.habilitada;
     },
@@ -579,6 +657,7 @@ const srv = {
     },
     aplicarCarga(ruts, datos) {
       soyAdmin(); let n = 0;
+      remoto('adm-habilitar', { empresas: ruts.map(rut => s.remutyme[rut] ? { rut, nombre: s.remutyme[rut].nombre } : { rut, nombre: datos[rut].nombre, correo: datos[rut].correoRrhh }) });
       ruts.forEach(rut => {
         if (!s.remutyme[rut] && datos && datos[rut]) s.remutyme[rut] = { nombre: datos[rut].nombre, cartera: 'Sin cartera', correoRrhh: datos[rut].correoRrhh, trabajadores: [] };
         if (!s.remutyme[rut]) return;
@@ -655,6 +734,12 @@ function vistaLogin() {
       input('o-rut', 'RUT de la empresa', { ac: 'username', ph: 'Ej. 99.000.100-6' }) + errorGeneral() +
       (ui.aviso ? '<div class="nota nota-info" role="status">' + esc(ui.aviso) + '</div>' : '<button type="submit" class="btn btn-pri">Avisar a Contyme</button>') +
       '<button type="button" class="btn-link" data-a="paso" data-v="rut">Volver al ingreso</button></form>';
+  } else if (ui.paso === 'admin-codigo') {
+    cuerpo = '<form id="f-codigo" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Revisa tu correo</h2>' +
+      '<p class="sub">Si <b>' + esc(ui.adminCorreo) + '</b> tiene acceso, le mandamos un código de 6 números. Vence en 10 minutos.</p>' +
+      input('a-codigo', 'Código', { im: 'numeric', ac: 'one-time-code', ph: '000000', max: 6 }) + errorGeneral() +
+      '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Entrando…' : 'Entrar') + '</button>' +
+      '<button type="button" class="btn-link" data-a="paso" data-v="contyme">Usar otro correo</button></form>';
   } else if (ui.paso === 'contyme') {
     cuerpo = '<form id="f-admin" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Equipo Contyme</h2>' +
       '<p class="sub">Solo para administradores de Contyme. Ingresa tu correo de Contyme.</p>' +
@@ -707,7 +792,7 @@ function itemNovedad(n, o) {
   o = o || {};
   const def = TIPOS[n.tipo] || {};
   let adj = '';
-  if (n.adjunto) { const u = previas.get(n.id); adj = '<div class="adj">' + (u && /^image\//.test(n.adjunto.mime) ? '<img src="' + esc(u) + '" alt="Respaldo de ' + esc(n.trabajador) + '">' : '') + 'Respaldo: ' + esc(n.adjunto.nombre) + '</div>'; }
+  if (n.adjunto) { const u = previas.get(n.id); adj = '<div class="adj">' + (u && /^image\//.test(n.adjunto.mime) ? '<img src="' + esc(u) + '" alt="Respaldo de ' + esc(n.trabajador) + '">' : '') + 'Respaldo: ' + (n.adjunto.url ? '<a href="' + esc(n.adjunto.url) + '" target="_blank" rel="noopener">' + esc(n.adjunto.nombre) + '</a>' : esc(n.adjunto.nombre)) + '</div>'; }
   const marcas = [];
   if (n.ejemplo) marcas.push('<span class="pill p-neutro">Ejemplo</span>');
   if (def.importante && !n.adjunto) marcas.push('<span class="pill p-warn">Falta respaldo</span>');
@@ -900,13 +985,13 @@ function admEmpresas() {
     '<p class="sub">Solo estos RUT pueden entrar. ' + (lnk ? 'Modo <b>link de un solo uso</b>: cada empresa recibe un link personal que vence en ' + CONFIG.horasLink + ' h para crear su clave. «Restablecer clave» manda un link nuevo.' : 'Modo <b>clave inicial</b>: la primera vez entran con la clave inicial y crean una propia. «Restablecer clave» la devuelve a la inicial.') + ' Nunca dictes ni mandes claves por correo o mensaje.</p>' +
     '<div class="dos"><div class="ancho tabla-caja"><table class="tabla-resp"><caption class="sr">Cuentas de empresas en la app</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Acceso</th><th scope="col">Correo de contacto</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
     '<div class="angosto"><form id="f-masiva" class="caja" novalidate><h2 style="font-size:17px">Habilitar empresas (masivo)</h2>' +
-    '<p class="sub">Una empresa por línea: <b>RUT; nombre de la empresa; correo de RRHH</b> (el correo es opcional). Sirve pegar las columnas desde Excel o subir un CSV. Antes de habilitar te mostramos qué va a pasar.</p>' +
-    '<div class="campo"><label for="masiva">Empresas</label><textarea id="masiva" rows="6" placeholder="RUT; Nombre de la empresa; correo"' + aria('masiva') + '>' + esc(val('masiva')) + '</textarea>' + pieCampo('masiva') + '</div>' +
+    '<p class="sub">Una empresa por línea: <b>RUT; nombre de la empresa; correo de la encargada en Contyme</b> (a ese correo llegan sus novedades). Sirve pegar las columnas desde Excel o subir un CSV. Antes de habilitar te mostramos qué va a pasar.</p>' +
+    '<div class="campo"><label for="masiva">Empresas</label><textarea id="masiva" rows="6" placeholder="RUT; Nombre de la empresa; encargada@contyme.cl"' + aria('masiva') + '>' + esc(val('masiva')) + '</textarea>' + pieCampo('masiva') + '</div>' +
     '<div class="campo"><label for="masiva-archivo">O sube un archivo CSV</label><input id="masiva-archivo" type="file" accept=".csv,.txt,text/csv,text/plain"></div>' +
     res + (ui.carga && ui.carga.listo == null ? '' : '<button type="submit" class="btn btn-pri">Revisar lista</button>') + '</form></div></div>';
 }
 function admActividad() {
-  const tipos = { todo: 'Todo', correo: 'Correos (simulados)', seguridad: 'Seguridad', accion: 'Acciones' };
+  const tipos = { todo: 'Todo', correo: REMOTO ? 'Correos' : 'Correos (simulados)', seguridad: 'Seguridad', accion: 'Acciones' };
   const lista = s.actividad.filter(a => ui.actFiltro === 'todo' || a.tipo === ui.actFiltro).slice(-80).reverse();
   const etiqueta = { correo: ['Correo simulado', 'p-info'], seguridad: ['Seguridad', 'p-crit'], accion: ['Acción', 'p-neutro'] };
   return '<div class="fila-titulo"><h1 id="titulo" tabindex="-1" style="font-size:24px">Actividad</h1><span class="sub">Registro de lo que pasó en la app (en la real, quién lo hizo y desde dónde)</span></div>' +
@@ -919,9 +1004,10 @@ function admAjustes() {
   return '<div class="fila-titulo"><h1 id="titulo" tabindex="-1" style="font-size:24px">Ajustes</h1></div>' +
     '<section class="caja" aria-labelledby="t-act"><h2 id="t-act" style="font-size:18px">Cómo crea su clave cada empresa · <span class="pill p-warn">Pendiente de decisión</span></h2>' +
     '<p class="sub">Las dos opciones están armadas. En la demo puedes cambiar entre ellas para probarlas; en la versión real queda fija la que se elija.</p>' +
-    '<div class="seg" role="group" aria-label="Forma de activación">' +
+    (REMOTO ? '<p class="nota nota-info">Con el servidor activo se usa la <b>clave inicial</b>, guardada en la configuración del servidor (no en el código).</p>' : '') +
+    (REMOTO ? '' : '<div class="seg" role="group" aria-label="Forma de activación">') + (REMOTO ? '' :
     '<button type="button" data-a="activacion" data-v="clave-inicial" aria-pressed="' + (m === 'clave-inicial') + '">Clave inicial genérica</button>' +
-    '<button type="button" data-a="activacion" data-v="link" aria-pressed="' + (m === 'link') + '">Link de un solo uso</button></div>' +
+    '<button type="button" data-a="activacion" data-v="link" aria-pressed="' + (m === 'link') + '">Link de un solo uso</button></div>') +
     '<div class="compara"><div class="nota nota-info"><strong>Clave inicial genérica</strong><ul>' +
     '<li>Simple: no depende de que el correo de la empresa esté al día.</li>' +
     '<li><b>Riesgo:</b> es la misma para todas y los RUT de empresas son públicos: quien sepa que una empresa es cliente y conozca la clave puede activar la cuenta antes que ella.</li>' +
@@ -940,6 +1026,7 @@ function vistaAdmin() {
   const cuerpo = ui.admTab === 'empresas' ? admEmpresas() : ui.admTab === 'actividad' ? admActividad() : ui.admTab === 'ajustes' ? admAjustes() : admBandeja();
   return '<header class="adm-top gutter"><div class="adm-top-in"><div class="adm-marca"><span>Contyme · Administración</span><span>' + esc(sesion.correo) + '</span></div>' +
     '<nav class="adm-nav" aria-label="Administración">' + nav('bandeja', 'Bandeja') + nav('empresas', 'Empresas', piden) + nav('actividad', 'Actividad') + nav('ajustes', 'Ajustes') + '</nav>' +
+    (REMOTO ? '<button type="button" class="salir" data-a="actualizar">Actualizar</button>' : '') +
     '<button type="button" class="salir" data-a="salir">Salir</button></div></header>' +
     '<main id="principal" class="adm-main gutter entra">' + cuerpo + '</main>';
 }
@@ -966,7 +1053,7 @@ function pintar() {
   document.body.classList.toggle('es-admin', !!(sesion && sesion.rol === 'admin'));
   $('raiz').innerHTML = !sesion ? vistaLogin() : sesion.rol === 'admin' ? vistaAdmin() : vistaCliente();
   $('demo-barra').innerHTML = CONFIG.demo ? '<div class="demo-barra gutter" role="note"><span>DEMO · datos ficticios · el acceso y los correos son simulados</span><button type="button" data-a="que-simulado">¿Qué es simulado?</button></div>'
-    : '<div class="demo-barra gutter" role="note"><span>Versión piloto · lo que ingreses queda guardado solo en este dispositivo</span><button type="button" data-a="que-simulado">Más info</button></div>';
+    : REMOTO ? '' : '<div class="demo-barra gutter" role="note"><span>Versión piloto · lo que ingreses queda guardado solo en este dispositivo</span><button type="button" data-a="que-simulado">Más info</button></div>';
   let destino = null;
   if (ui.foco) { destino = document.querySelector(ui.foco.charAt(0) === '[' ? ui.foco : '#' + ui.foco); ui.foco = null; }
   else if (sel) { destino = document.querySelector(sel); if (destino === act) destino = null; }
@@ -1069,6 +1156,7 @@ const ACC = {
   'demo-link': v => { const c = s.cuentas[v]; if (!c) return; if (c.hash) { toast('Esa empresa ya tiene clave. Restablécela desde Administración.'); return; } if (!c.link) { crearLink(v); guardar(); } abrirLinkDemo(c.link.token); },
   ver: (v, b) => { const i = $(v); if (!i) return; const mostrar = i.type === 'password'; i.type = mostrar ? 'text' : 'password'; b.textContent = mostrar ? 'Ocultar' : 'Mostrar'; b.setAttribute('aria-pressed', String(mostrar)); b.setAttribute('aria-label', mostrar ? 'Ocultar la clave' : 'Mostrar la clave'); },
   salir: () => cerrarSesion('Cerraste la sesión.'),
+  actualizar: async () => { toast('Actualizando…'); if (await cargarAdmin()) { pintar(); toast('Al día'); } },
   tab: v => ir(v, v === ui.tab && v === 'nueva'),
   nueva: () => ir('nueva'),
   tipo: v => {
@@ -1106,7 +1194,7 @@ const ACC = {
         (ejemplos ? '<div class="nota nota-info">Hay ' + plural(ejemplos, 'novedad de ejemplo', 'novedades de ejemplo') + ' de la demo. Quítalas si no corresponden.</div>' : '') +
         '<p class="sub">Después de enviar ya no puedes cambiarlas. Si te falta algo, tu encargada puede reabrir el envío.</p>',
       ok: 'Sí, enviar', cancelar: 'Revisar de nuevo',
-      accion: () => { const r = srv.cli.enviar(); if (r.error) { toast(r.error); return; } ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Enviado a Contyme'); }
+      accion: async () => { if (REMOTO) toast('Enviando a Contyme…'); const r = await srv.cli.enviar(); if (r.error) { toast(r.error); return; } ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Enviado a Contyme'); }
     });
   },
   pdf: v => toast('Demo: en la app real aquí se descarga el PDF de ' + v + '.'),
@@ -1114,11 +1202,11 @@ const ACC = {
   filtro: v => { ui.filtro = v; pintar(); },
   'limpiar-filtro': () => { ui.filtro = 'todas'; ui.buscar = ''; ui.foco = 'buscar'; pintar(); },
   sel: v => { ui.sel = v; ui.foco = 'det-titulo'; pintar(); },
-  recordar: v => { srv.adm.recordar(v); pintar(); toast('Recordatorio enviado a ' + s.remutyme[v].nombre + ' (simulado)'); },
+  recordar: v => { srv.adm.recordar(v); pintar(); toast('Recordatorio enviado a ' + s.remutyme[v].nombre + SIM); },
   'recordar-todas': () => {
     const p = srv.adm.empresas().filter(r => estadoAdm(r)[0] === 'No ha enviado' && s.cuentas[r].habilitada);
     dialogo({ titulo: '¿Recordar a ' + plural(p.length, 'empresa', 'empresas') + '?', html: '<ul>' + p.map(r => '<li>' + esc(s.remutyme[r].nombre) + (s.recordados[r] ? ' <span class="sub">(ya recordada ' + esc(fmtHora(s.recordados[r])) + ')</span>' : '') + '</li>').join('') + '</ul><p class="sub">Les llega un correo corto pidiendo que envíen sus novedades antes del ' + esc(fmtCorta(CONFIG.periodo.plazo)) + '.</p>',
-      ok: 'Enviar recordatorios', accion: () => { p.forEach(r => srv.adm.recordar(r)); pintar(); toast(plural(p.length, 'recordatorio enviado', 'recordatorios enviados') + ' (simulado)'); } });
+      ok: 'Enviar recordatorios', accion: () => { p.forEach(r => srv.adm.recordar(r)); pintar(); toast(plural(p.length, 'recordatorio enviado', 'recordatorios enviados') + SIM); } });
   },
   marcar: v => { srv.adm.marcar(ui.sel, v); ui.foco = 'det-titulo'; pintar(); toast(v === 'revisada' ? 'Marcada revisada' : v === 'ingresada' ? 'Marcada ingresada' : 'Vuelve a «Por revisar»'); },
   copiar: () => copiar(textoExcel(ui.sel)),
@@ -1127,7 +1215,7 @@ const ACC = {
     dialogo({ titulo: 'Pedir corrección a ' + nom, ok: 'Reabrir y avisar',
       html: '<p class="sub">El envío vuelve a borrador para que la empresa corrija y envíe de nuevo. Le llega un aviso con tu mensaje.</p><div class="campo"><label for="dlg-nota">¿Qué tiene que revisar?</label><textarea id="dlg-nota" rows="3" maxlength="300" placeholder="Ej. falta la foto de la licencia de María"></textarea><span class="err-campo" id="dlg-err" hidden></span></div>',
       accion: d => { const t = d.querySelector('#dlg-nota').value.trim(); if (t.length < 5) { const e = d.querySelector('#dlg-err'); e.textContent = 'Escribe qué tiene que revisar (así el cliente sabe qué hacer).'; e.hidden = false; d.querySelector('#dlg-nota').setAttribute('aria-invalid', 'true'); d.querySelector('#dlg-nota').focus(); return false; }
-        srv.adm.reabrir(rut, t); ui.foco = 'det-titulo'; pintar(); toast('Envío reabierto; aviso enviado (simulado)'); } });
+        srv.adm.reabrir(rut, t); ui.foco = 'det-titulo'; pintar(); toast('Envío reabierto; aviso enviado' + SIM); } });
   },
   restablecer: v => {
     const nom = s.remutyme[v].nombre;
@@ -1135,7 +1223,7 @@ const ACC = {
       html: '<p>' + (modo() === 'link' ? 'Su clave deja de servir y le llega un link nuevo para crear otra.' : 'Su clave deja de servir y vuelve a entrar con la clave inicial.') + '</p><p class="sub">Hazlo solo si la empresa lo pidió. No dictes ni mandes claves por correo o mensaje.</p>',
       accion: () => { srv.adm.restablecer(v); pintar(); toast('Clave restablecida'); } });
   },
-  'enviar-link': v => { srv.adm.enviarLink(v); pintar(); toast('Link enviado a RRHH de ' + s.remutyme[v].nombre + ' (simulado)'); },
+  'enviar-link': v => { srv.adm.enviarLink(v); pintar(); toast('Link enviado a RRHH de ' + s.remutyme[v].nombre + SIM); },
   'abrir-link': v => { const c = s.cuentas[v]; if (!c || !c.link) return; const tk = c.link.token; cerrarSesion('', true); abrirLinkDemo(tk); toast('Abriste el link como lo vería la empresa'); },
   bloqueo: v => {
     const c = s.cuentas[v], nom = s.remutyme[v].nombre;
@@ -1186,7 +1274,7 @@ document.addEventListener('change', ev => {
     if (f.size > CONFIG.maxArchivoMB * 1048576) { ui.err = { campo: 'archivo', msg: 'El archivo pesa ' + fmtNum(f.size / 1048576) + ' MB; el máximo es ' + CONFIG.maxArchivoMB + ' MB. Prueba con una foto más liviana.' }; ui.foco = 'archivo'; pintar(); return; }
     if (!f.size) { ui.err = { campo: 'archivo', msg: 'El archivo está vacío. Vuelve a sacar la foto.' }; ui.foco = 'archivo'; pintar(); return; }
     const mime = f.type || (/\.pdf$/i.test(f.name) ? 'application/pdf' : 'image/*');
-    ui.archivo = { nombre: f.name.slice(0, 80), kb: Math.max(1, Math.round(f.size / 1024)), mime, url: /^image\//.test(mime) ? URL.createObjectURL(f) : null };
+    ui.archivo = { nombre: f.name.slice(0, 80), kb: Math.max(1, Math.round(f.size / 1024)), mime, url: /^image\//.test(mime) ? URL.createObjectURL(f) : null, file: f };
     ui.err = null; ui.foco = '[data-a="quitar-archivo"]'; pintar(); return;
   }
   if (t.id === 'masiva-archivo') {
@@ -1238,6 +1326,17 @@ function leerCampos(tipo) {
   return { datos };
 }
 const SUB = {
+  'f-codigo': async () => {
+    if (ui.cargando) return;
+    const cod = String(val('a-codigo')).replace(/\D/g, '');
+    if (cod.length !== 6) return falla('a-codigo', 'El código tiene 6 números.');
+    ui.cargando = true; pintar();
+    const r = await api('admin-entrar', { correo: ui.adminCorreo, codigo: cod }); ui.cargando = false;
+    if (!r.ok) { ui.err = { campo: r.campo || null, msg: r.error }; ui.foco = 'a-codigo'; pintar(); return; }
+    sesion = { rol: 'admin', correo: r.correo, token: r.token, ultimo: Date.now() }; guardarSesion();
+    await cargarAdmin();
+    entrar(sesion, 'Hola, ' + r.correo.split('@')[0]);
+  },
   'f-admin': async () => {
     if (ui.cargando) return;
     const correo = String(val('a-correo')).trim().toLowerCase();
@@ -1246,6 +1345,12 @@ const SUB = {
     let ok = false; try { ok = await esAdmin(correo); } catch (e) { ok = false; }
     ui.cargando = false;
     if (!ok) { ui.err = { msg: 'Este correo no tiene acceso de administrador.' }; ui.foco = 'a-correo'; pintar(); return; }
+    if (REMOTO) {
+      ui.cargando = true; pintar();
+      const r = await api('admin-codigo', { correo }); ui.cargando = false;
+      if (r.error) { ui.err = { msg: r.error }; pintar(); return; }
+      ui.paso = 'admin-codigo'; ui.adminCorreo = correo; ui.err = null; ui.form = {}; ui.foco = 'a-codigo'; pintar(); return;
+    }
     entrar({ rol: 'admin', correo }, 'Hola, ' + correo.split('@')[0]);
     registrar(null, 'seguridad', 'Ingreso de administrador: ' + correo + '.'); guardar();
   },
@@ -1255,7 +1360,7 @@ const SUB = {
     ui.cargando = true; ui.err = null; ui.aviso = ''; pintar();
     let r; try { r = await srv.ingresar(rutTxt, clave); } catch (e) { r = { error: 'No pudimos revisar la clave. Intenta de nuevo.' }; }
     ui.cargando = false;
-    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
     if (r.paso === 'crear') { ui.paso = 'crear'; ui.ticket = r.ticket; ui.crearPara = { rut: r.rut, nombre: r.nombre }; ui.form = {}; ui.foco = 'nueva'; pintar(); return; }
     ui.form.clave = ''; falla(r.campo, r.error);
   },
@@ -1264,7 +1369,7 @@ const SUB = {
     ui.cargando = true; ui.err = null; pintar();
     let r; try { r = await srv.crearClave(ui.ticket, val('nueva'), val('repite'), val('contacto')); } catch (e) { r = { error: 'No pudimos guardar la clave. Intenta de nuevo.' }; }
     ui.cargando = false;
-    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
     if (r.reiniciar) { ui.paso = 'rut'; ui.form = {}; }
     if (r.campo === 'nueva' || r.campo === 'repite') { ui.form.repite = ''; }
     falla(r.campo, r.error);
@@ -1292,6 +1397,7 @@ const SUB = {
     const res = srv.cli.guardarNovedad({ trabajador, tipo: ui.tipo, datos: r.datos, comentario: String(val('comentario')).trim(), adjunto: a }, ui.editando);
     if (res.error) return falla(null, res.error);
     if (a && ui.archivo.url) previas.set(res.id, ui.archivo.url); else if (!a) previas.delete(res.id);
+    if (a && ui.archivo.file) archivosMem.set(res.id, ui.archivo.file); else if (!a) archivosMem.delete(res.id);
     const editado = ui.editando != null;
     ir('mes');
     toast(repetida ? 'Guardada. Ojo: ' + trabajador + ' ya tenía otra novedad de ese tipo; revisa que no esté repetida.' : editado ? 'Cambios guardados' : 'Novedad guardada. Falta enviar a Contyme.');
@@ -1318,6 +1424,9 @@ function aplicarTema() { const t = leerLS(LS_TEMA); if (t === 'light' || t === '
 aplicarTema();
 listo = (window.crypto && crypto.subtle ? prepararSemillas() : Promise.resolve()).catch(() => {});
 pintar();
+if (REMOTO && sesion && sesion.token) {
+  (sesion.rol === 'admin' ? cargarAdmin() : api('cli-datos').then(r => { if (r.ok) cargarCliente(r.datos); })).then(() => { if (sesion) pintar(); });
+}
 })();
 </script>
 
