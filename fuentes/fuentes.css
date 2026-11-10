@@ -1,0 +1,15 @@
+/* Fuentes dentro de la app (Google Fonts, licencia OFL), para que se vean igual sin internet. Solo el juego latino (incluye á, é, ñ). */
+@font-face {
+  font-family: 'Outfit';
+  font-style: normal;
+  font-weight: 500 700;
+  font-display: swap;
+  src: url(outfit.woff2) format('woff2');
+}
+@font-face {
+  font-family: 'Source Sans 3';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url(source-sans-3.woff2) format('woff2');
+}

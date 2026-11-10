@@ -1,0 +1,1323 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Novedades Contyme</title>
+<meta name="description" content="Demo: las empresas envían a Contyme las novedades de sus trabajadores para las liquidaciones del mes.">
+<meta name="theme-color" content="#0F4C47">
+<meta name="robots" content="noindex, nofollow">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="iconos/favicon-32.png">
+<link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Novedades">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="stylesheet" href="fuentes/fuentes.css">
+<style>
+/* Lo que el visor de artefactos ponía por fuera: márgenes seguros del teléfono y reinicio mínimo. */
+:root { color-scheme: light; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); }
+body { margin: 0; -webkit-tap-highlight-color: transparent; }
+img { max-width: 100%; }
+[hidden] { display: none !important; }
+</style>
+<style>
+/* Novedades Contyme · DEMO con datos ficticios.
+   Este archivo es público (GitHub): no contiene datos reales, claves reales, correos reales ni URLs internas. */
+:root {
+  --bg: #F3F6F5; --card: #FFFFFF; --fg: #13201F; --muted: #52625F; --line: #D9E2E0; --line-fuerte: #9FB3AF;
+  --brand: #0F4C47; --brand-fg: #FFFFFF; --brand-soft: #E3F1EE; --brand-ink: #0B5A54; --head-sub: #CDEAE5;
+  --ok-bg: #DCF2E9; --ok-fg: #0E5E3F; --warn-bg: #FEF3C7; --warn-fg: #7A4A06; --crit-bg: #FDE8DD; --crit-fg: #9A3412;
+  --info-bg: #E8EEFB; --info-fg: #1E3A8A; --admin: #1F2A37; --admin-sub: #C7D2DE; --sombra: 0 10px 30px rgba(15, 30, 28, .18);
+  --display: "Outfit", "Segoe UI", system-ui, sans-serif;
+  --body: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #0E1615; --card: #16211F; --fg: #E6EFED; --muted: #9DB0AC; --line: #2A3A37; --line-fuerte: #4A605B;
+  --brand: #0F4C47; --brand-fg: #FFFFFF; --brand-soft: #173A36; --brand-ink: #8FD6CB; --head-sub: #B7E0D9;
+  --ok-bg: #133B2C; --ok-fg: #9BE3C3; --warn-bg: #3D2E0A; --warn-fg: #F8D57E; --crit-bg: #42200F; --crit-fg: #F9B38F;
+  --info-bg: #1B2748; --info-fg: #B5C8F7; --admin: #1F2A37; --admin-sub: #C7D2DE; --sombra: 0 10px 30px rgba(0,0,0,.5); color-scheme: dark } }
+:root[data-theme="dark"] {
+  --bg: #0E1615; --card: #16211F; --fg: #E6EFED; --muted: #9DB0AC; --line: #2A3A37; --line-fuerte: #4A605B;
+  --brand: #0F4C47; --brand-fg: #FFFFFF; --brand-soft: #173A36; --brand-ink: #8FD6CB; --head-sub: #B7E0D9;
+  --ok-bg: #133B2C; --ok-fg: #9BE3C3; --warn-bg: #3D2E0A; --warn-fg: #F8D57E; --crit-bg: #42200F; --crit-fg: #F9B38F;
+  --info-bg: #1B2748; --info-fg: #B5C8F7; --admin: #1F2A37; --admin-sub: #C7D2DE; --sombra: 0 10px 30px rgba(0,0,0,.5); color-scheme: dark }
+
+html, body { min-height: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--body); font-size: 16px; line-height: 1.45; -webkit-text-size-adjust: 100%; }
+body::before { content: ""; position: fixed; inset: 0 0 auto; height: env(safe-area-inset-top, 0px); z-index: 30; background: var(--brand); }
+body.es-admin::before { background: var(--admin); }
+* { box-sizing: border-box; }
+button, input, select, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 3px solid #F59E0B; outline-offset: 2px; }
+[tabindex="-1"]:focus { outline: none; }
+[hidden] { display: none !important; }
+input::-ms-reveal, input::-ms-clear { display: none; }
+svg { flex-shrink: 0; }
+h1, h2, h3 { font-family: var(--display); text-wrap: balance; margin: 0; }
+p { margin: 0; }
+.gutter { padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.sr { position: absolute !important; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.saltar { position: absolute; left: 12px; top: -60px; z-index: 50; background: var(--card); color: var(--fg); padding: 10px 14px; border-radius: 10px; font-weight: 700; }
+.saltar:focus { top: 12px; }
+
+/* Barra de demo: siempre visible para que nadie confunda la demo con un sistema seguro */
+.demo-barra { background: var(--warn-bg); color: var(--warn-fg); font-size: 13px; font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 4px 10px; padding-block: 6px; text-align: center; }
+.demo-barra button { background: transparent; border: 0; color: inherit; text-decoration: underline; font-weight: 700; min-height: 32px; cursor: pointer; padding: 0 4px; }
+
+/* Ingreso */
+.login { min-height: 100%; display: flex; flex-direction: column; max-width: 480px; margin: 0 auto; }
+.login-top { background: var(--brand); color: var(--brand-fg); padding-block: 36px 26px; display: flex; flex-direction: column; gap: 10px; }
+.login-top h1 { font-size: 30px; font-weight: 700; }
+.login-top p { color: var(--head-sub); }
+.login-cuerpo { padding-block: 24px; display: flex; flex-direction: column; gap: 16px; }
+.login-cuerpo h2 { font-size: 20px; }
+.demo { background: var(--card); border: 1px dashed var(--line-fuerte); border-radius: 14px; padding: 14px; display: flex; flex-direction: column; gap: 10px; }
+.demo-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { min-height: 40px; padding: 0 12px; border-radius: 999px; border: 1px solid var(--line-fuerte); background: var(--bg); font-size: 14px; font-weight: 600; cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
+.pie-login { text-align: center; padding-bottom: 16px; }
+
+/* App del cliente */
+.app { max-width: 480px; margin: 0 auto; min-height: 100%; display: flex; flex-direction: column; }
+.top { background: var(--brand); color: var(--brand-fg); padding-block: 14px 18px; display: flex; flex-direction: column; gap: 10px; }
+.top-row { display: flex; justify-content: space-between; align-items: center; gap: 12px; }
+.eyebrow { font-size: 12px; letter-spacing: .08em; text-transform: uppercase; color: var(--head-sub); }
+.empresa { font-weight: 600; font-size: 15px; overflow-wrap: anywhere; }
+.salir { min-height: 44px; padding: 0 14px; border-radius: 999px; border: 1px solid rgba(255,255,255,.45); background: transparent; color: inherit; font-weight: 600; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+.top h1 { font-size: 26px; font-weight: 700; }
+.top p { color: var(--head-sub); font-size: 15px; }
+.estado { background: rgba(255,255,255,.12); border-radius: 12px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
+.plazo { font-size: 14px; color: var(--head-sub); display: flex; gap: 6px; align-items: center; }
+main.cli { flex: 1; padding-block: 18px 28px; display: flex; flex-direction: column; gap: 14px; }
+.fila-titulo { display: flex; justify-content: space-between; align-items: baseline; gap: 8px 12px; flex-wrap: wrap; }
+.fila-titulo h2 { font-size: 19px; font-weight: 600; }
+.sub { color: var(--muted); font-size: 14px; }
+.centro { text-align: center; }
+
+.pill { display: inline-block; font-size: 12px; font-weight: 700; padding: 4px 10px; border-radius: 999px; white-space: nowrap; }
+.p-ok { background: var(--ok-bg); color: var(--ok-fg); } .p-warn { background: var(--warn-bg); color: var(--warn-fg); }
+.p-crit { background: var(--crit-bg); color: var(--crit-fg); } .p-info { background: var(--info-bg); color: var(--info-fg); }
+.p-neutro { background: var(--bg); color: var(--muted); border: 1px solid var(--line); }
+
+.lista { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+.nov { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
+.avatar { width: 40px; height: 40px; flex-shrink: 0; border-radius: 20px; display: grid; place-items: center; font-weight: 700; background: var(--brand-soft); color: var(--brand-ink); }
+.nov-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
+.nov-txt > span { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
+.nov-tipo { font-weight: 700; color: var(--brand-ink) !important; }
+.marcas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
+.adj { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--brand-ink); font-weight: 600; overflow-wrap: anywhere; }
+.adj img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
+.nov-acc { display: flex; flex-direction: column; margin: -8px -8px 0 0; }
+.icon-btn { width: 44px; height: 44px; border: 0; background: transparent; color: var(--muted); display: grid; place-items: center; border-radius: 22px; cursor: pointer; flex-shrink: 0; }
+.icon-btn:hover { background: var(--brand-soft); color: var(--brand-ink); }
+
+.vacio { background: var(--card); border: 1px dashed var(--line-fuerte); border-radius: 14px; padding: 20px 16px; text-align: center; display: flex; flex-direction: column; gap: 4px; }
+.btn { min-height: 50px; border-radius: 14px; font-weight: 700; font-size: 16px; display: flex; align-items: center; justify-content: center; gap: 8px; cursor: pointer; width: 100%; padding: 0 16px; text-align: center; }
+.btn-pri { background: var(--brand); color: var(--brand-fg); border: 1px solid var(--brand); }
+.btn-sec { background: var(--card); color: var(--brand-ink); border: 1px solid var(--brand-ink); }
+.btn-peligro { background: var(--crit-fg); color: var(--card); border: 1px solid var(--crit-fg); }
+.btn-chico { min-height: 40px; width: auto; font-size: 14px; border-radius: 10px; padding: 0 12px; }
+.btn-link { background: transparent; border: 0; color: var(--brand-ink); font-weight: 600; text-decoration: underline; min-height: 44px; cursor: pointer; padding: 0 6px; }
+.btn-link.chico { font-size: 14px; color: var(--muted); }
+.btn[disabled] { opacity: .55; cursor: not-allowed; }
+
+.campo { display: flex; flex-direction: column; gap: 6px; }
+.campo > label, legend { font-size: 15px; font-weight: 700; }
+.campo input, .campo select, .campo textarea { min-height: 48px; border-radius: 12px; border: 1px solid var(--line-fuerte); background: var(--card); padding: 10px 12px; font-size: 16px; width: 100%; }
+.campo input[aria-invalid="true"], .campo select[aria-invalid="true"], .campo textarea[aria-invalid="true"] { border: 2px solid var(--crit-fg); }
+.err-campo { color: var(--crit-fg); font-size: 14px; font-weight: 700; display: flex; gap: 6px; align-items: flex-start; }
+.err-campo::before { content: "!"; flex-shrink: 0; width: 18px; height: 18px; border-radius: 9px; background: var(--crit-fg); color: var(--card); font-size: 12px; display: grid; place-items: center; margin-top: 1px; }
+.pass { position: relative; }
+.pass input { padding-right: 92px; }
+.pass .ver { position: absolute; right: 4px; top: 4px; bottom: 4px; min-width: 80px; border: 0; border-radius: 9px; background: var(--brand-soft); color: var(--brand-ink); font-weight: 700; font-size: 14px; cursor: pointer; }
+.dos-col { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+fieldset { border: 0; margin: 0; padding: 0; min-width: 0; }
+legend { padding: 0; margin-bottom: 8px; display: flex; gap: 8px; align-items: center; }
+.num { width: 24px; height: 24px; border-radius: 12px; background: var(--brand); color: var(--brand-fg); font-size: 13px; display: inline-grid; place-items: center; flex-shrink: 0; }
+.tipos { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+@media (max-width: 350px) { .tipos { grid-template-columns: repeat(2, minmax(0, 1fr)); } .dos-col { grid-template-columns: 1fr; } }
+.tipos button { min-height: 52px; border-radius: 12px; border: 1px solid var(--line-fuerte); background: var(--card); font-weight: 600; font-size: 14px; cursor: pointer; padding: 4px; line-height: 1.2; }
+.tipos button[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-fg); }
+.foto { position: relative; min-height: 64px; border-radius: 12px; border: 1px dashed var(--brand-ink); background: var(--card); display: flex; align-items: center; justify-content: center; gap: 10px; font-weight: 700; color: var(--brand-ink); cursor: pointer; padding: 8px 12px; text-align: center; }
+.foto:focus-within { outline: 3px solid #F59E0B; outline-offset: 2px; }
+.foto input { position: absolute; inset: 0; opacity: 0; cursor: pointer; width: 100%; }
+.archivo-listo { display: flex; align-items: center; gap: 10px; background: var(--brand-soft); border-radius: 12px; padding: 8px 10px; color: var(--brand-ink); font-weight: 600; font-size: 14px; }
+.archivo-listo img { width: 48px; height: 48px; object-fit: cover; border-radius: 8px; }
+.archivo-listo span { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.error { color: var(--crit-fg); background: var(--crit-bg); border-radius: 12px; padding: 10px 12px; font-size: 15px; font-weight: 600; }
+.nota { border-radius: 12px; padding: 12px 14px; font-size: 15px; display: flex; flex-direction: column; gap: 4px; }
+.nota-info { background: var(--info-bg); color: var(--info-fg); }
+.nota-warn { background: var(--warn-bg); color: var(--warn-fg); }
+.nota-crit { background: var(--crit-bg); color: var(--crit-fg); }
+.contador { align-self: flex-end; font-size: 13px; color: var(--muted); }
+
+.aviso-ok { background: var(--ok-bg); color: var(--ok-fg); border-radius: 14px; padding: 14px; display: flex; gap: 12px; align-items: flex-start; }
+.pasos { list-style: none; margin: 0; padding: 0; }
+.paso { display: flex; gap: 12px; }
+.paso-marca { display: flex; flex-direction: column; align-items: center; }
+.punto { width: 22px; height: 22px; border-radius: 11px; border: 2px solid var(--muted); background: var(--card); display: grid; place-items: center; color: var(--card); }
+.paso.hecho .punto { background: var(--brand-ink); border-color: var(--brand-ink); }
+.linea { width: 2px; flex: 1; min-height: 20px; background: var(--line); }
+.paso.hecho .linea { background: var(--brand-ink); }
+.paso-txt { padding-bottom: 14px; display: flex; flex-direction: column; }
+.paso-txt span { color: var(--muted); font-size: 14px; }
+.mes { background: var(--card); border: 1px solid var(--line); border-radius: 14px; min-height: 58px; padding: 6px 6px 6px 14px; display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+
+.tabs { position: sticky; bottom: 0; z-index: 5; background: var(--card); border-top: 1px solid var(--line); display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+.tabs button { position: relative; border: 0; background: transparent; min-height: 54px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; border-radius: 10px; }
+.tabs button[aria-current="page"] { color: var(--brand-ink); background: var(--brand-soft); }
+.badge { min-width: 20px; height: 20px; padding: 0 6px; border-radius: 10px; background: var(--crit-fg); color: var(--card); font-size: 12px; font-weight: 700; display: inline-grid; place-items: center; }
+.tabs .badge { position: absolute; top: 4px; left: calc(50% + 6px); }
+
+/* Administrador */
+.adm-top { background: var(--admin); color: #FFFFFF; padding-block: 12px; }
+.adm-top-in { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 12px; justify-content: space-between; align-items: center; }
+.adm-marca { display: flex; flex-direction: column; min-width: 0; }
+.adm-marca span:first-child { font-family: var(--display); font-weight: 700; font-size: 20px; }
+.adm-marca span:last-child { font-size: 13px; color: var(--admin-sub); overflow-wrap: anywhere; }
+.adm-nav { display: flex; gap: 4px; flex-wrap: wrap; order: 3; width: 100%; }
+@media (min-width: 900px) { .adm-nav { order: 0; width: auto; } }
+.adm-nav button { min-height: 44px; padding: 0 12px; border-radius: 10px; border: 0; background: transparent; color: var(--admin-sub); font-weight: 600; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; }
+.adm-nav button[aria-current="page"] { background: #FFFFFF; color: var(--admin); }
+.adm-main { max-width: 1200px; width: 100%; margin: 0 auto; padding-block: 22px 40px; display: flex; flex-direction: column; gap: 18px; }
+.resumen { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 10px; }
+.dato { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 10px 14px; display: flex; flex-direction: column; gap: 2px; text-align: left; cursor: pointer; min-height: 72px; }
+.dato b { font-family: var(--display); font-size: 26px; font-variant-numeric: tabular-nums; }
+.dato[aria-pressed="true"] { border: 2px solid var(--brand-ink); background: var(--brand-soft); }
+.barra-herr { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; }
+.barra-herr .campo { flex: 1 1 240px; }
+.dos { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+.dos > .ancho { flex: 999 1 520px; min-width: 0; }
+.dos > .angosto { flex: 1 1 340px; min-width: 0; display: flex; flex-direction: column; gap: 18px; }
+.caja { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px; display: flex; flex-direction: column; gap: 12px; }
+.caja h3 { font-size: 17px; }
+.tabla-caja { background: var(--card); border: 1px solid var(--line); border-radius: 14px; overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 15px; }
+caption { text-align: left; padding: 12px 12px 0; }
+th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+td { padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+tr:last-child td { border-bottom: 0; }
+tr.sel td { background: var(--brand-soft); }
+.fila-btn { border: 0; background: transparent; padding: 0; text-align: left; font-weight: 700; cursor: pointer; color: var(--fg); min-height: 36px; text-decoration: underline; text-decoration-color: var(--line-fuerte); text-underline-offset: 3px; }
+.acciones { display: flex; flex-wrap: wrap; gap: 8px; }
+.acciones .btn { flex: 1 1 160px; width: auto; font-size: 15px; }
+.mono { font-variant-numeric: tabular-nums; }
+.resultado { border-radius: 12px; padding: 12px; font-size: 14px; background: var(--brand-soft); color: var(--fg); display: flex; flex-direction: column; gap: 8px; }
+.resultado ul { margin: 0; padding-left: 18px; }
+.resultado .malos { color: var(--crit-fg); }
+.seg { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.seg button { min-height: 48px; border-radius: 12px; border: 1px solid var(--line-fuerte); background: var(--card); font-weight: 700; cursor: pointer; padding: 6px 10px; }
+.seg button[aria-pressed="true"] { background: var(--brand); color: var(--brand-fg); border-color: var(--brand); }
+.compara { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; }
+.compara ul { margin: 6px 0 0; padding-left: 18px; font-size: 15px; display: flex; flex-direction: column; gap: 4px; }
+.actividad li { display: flex; gap: 10px; align-items: flex-start; padding: 10px 0; border-bottom: 1px solid var(--line); }
+.actividad li:last-child { border-bottom: 0; }
+.actividad time { font-size: 13px; color: var(--muted); white-space: nowrap; min-width: 92px; font-variant-numeric: tabular-nums; }
+.link-demo { font-family: ui-monospace, Consolas, monospace; font-size: 13px; overflow-wrap: anywhere; background: var(--bg); border-radius: 8px; padding: 6px 8px; }
+@media (max-width: 720px) {
+  .tabla-resp thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); }
+  .tabla-resp, .tabla-resp tbody, .tabla-resp tr, .tabla-resp td { display: block; width: 100%; }
+  .tabla-resp tr { border-bottom: 1px solid var(--line); padding: 8px 0; }
+  .tabla-resp tr:last-child { border-bottom: 0; }
+  .tabla-resp td { border: 0; padding: 4px 14px; }
+  .tabla-resp td[data-l]::before { content: attr(data-l); display: block; font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: .05em; }
+}
+
+/* Diálogo y aviso flotante */
+dialog { border: 0; border-radius: 16px; padding: 0; background: var(--card); color: var(--fg); width: min(460px, calc(100% - 32px)); box-shadow: var(--sombra); }
+dialog::backdrop { background: rgba(10, 20, 19, .55); }
+.dlg-in { padding: 20px; display: flex; flex-direction: column; gap: 14px; max-height: 80vh; overflow-y: auto; }
+.dlg-in h2 { font-size: 20px; }
+.dlg-in ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+.dlg-pie { display: flex; gap: 10px; flex-wrap: wrap-reverse; }
+.dlg-pie .btn { flex: 1 1 150px; width: auto; }
+.toast { position: fixed; left: 50%; bottom: calc(86px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); background: var(--fg); color: var(--bg); padding: 8px 8px 8px 16px; border-radius: 12px; font-weight: 600; font-size: 15px; z-index: 40; max-width: calc(100% - 32px); display: flex; align-items: center; gap: 10px; min-height: 44px; }
+.toast:empty { display: none; }
+.toast button { background: transparent; border: 1px solid currentColor; color: inherit; border-radius: 8px; min-height: 36px; padding: 0 10px; font-weight: 700; cursor: pointer; }
+@media (prefers-reduced-motion: no-preference) { .entra { animation: entra .18s ease-out; } @keyframes entra { from { opacity: .4; transform: translateY(4px); } to { opacity: 1; transform: none; } } }
+</style>
+</head>
+<body>
+<a class="saltar" href="#principal">Saltar al contenido</a>
+<div id="demo-barra"></div>
+<div id="raiz"></div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<dialog id="dlg" aria-labelledby="dlg-t"></dialog>
+
+<script>
+(() => {
+'use strict';
+/* =============================================================================
+   NOVEDADES CONTYME · DEMO
+   Todo este archivo es PÚBLICO (va a GitHub). Por eso:
+   - Solo datos ficticios: RUT 99.xxx.xxx, personas inventadas, correos *.demo.
+   - Ninguna clave real, ningún correo real, ninguna URL interna, ningún secreto.
+   - La "seguridad" de esta demo es SIMULADA: corre en el navegador y cualquiera
+     con el código o las herramientas del navegador puede saltársela. La real va
+     en el servidor de Remutyme (ver la capa `srv` más abajo: cada función es un
+     endpoint futuro).
+   ============================================================================= */
+const CONFIG = {
+  demo: true,                // false: oculta ayudas de prueba (chips, claves de demo, reinicio)
+  periodo: { id: '2026-11', nombre: 'Noviembre 2026', mes: 'noviembre', plazo: '2026-11-25' },
+  // PENDIENTE DE DECISIÓN (Contyme): 'clave-inicial' (clave genérica) o 'link' (link de un solo uso).
+  // En la demo se puede cambiar en Administración → Ajustes para probar las dos.
+  activacion: 'clave-inicial',
+  maxIntentos: 5,
+  minutosInactividad: 15,
+  horasLink: 72,
+  maxArchivoMB: 8,
+  claveMin: 8
+};
+/* Solo para la demo. En producción nada de esto existe en el código del navegador. */
+const DEMO = {
+  claveInicial: 'Contyme2026',        // ficticia, solo demo
+  admin: 'admin@contyme.demo',        // cuenta ficticia
+  semillas: { '99000137-5': 'Tornillo2026', '99000396-3': 'Robles2026' } // claves ficticias de empresas de prueba
+};
+const LS = 'novedades-contyme-demo-v4';
+const SS = 'novedades-contyme-sesion-v4';
+const LS_TEMA = 'novedades-contyme-tema';
+
+const TIPOS = {
+  'Horas extra': { campos: [{ id: 'horas', l: 'Cantidad de horas', t: 'num', ej: 'Ej. 6', min: 0.5, max: 120, ayuda: 'Puedes usar medias horas, por ejemplo 2,5.' }] },
+  'Bono': { campos: [{ id: 'monto', l: 'Monto en pesos', t: 'monto', ej: 'Ej. 50.000' }, { id: 'motivo', l: 'Motivo del bono', t: 'txt', ej: 'Ej. producción de octubre' }] },
+  'Licencia médica': { campos: [{ id: 'desde', l: 'Desde', t: 'fecha' }, { id: 'hasta', l: 'Hasta', t: 'fecha' }], adj: 'Saca una foto a la licencia o sube el PDF', importante: true },
+  'Vacaciones': { campos: [{ id: 'desde', l: 'Desde', t: 'fecha' }, { id: 'hasta', l: 'Hasta', t: 'fecha' }], adj: 'Comprobante firmado (si lo tienes)' },
+  'Ausencia': { campos: [{ id: 'dias', l: 'Cantidad de días', t: 'num', ej: 'Ej. 1', min: 0.5, max: 31 }, { id: 'motivo', l: 'Motivo', t: 'opc', ops: ['Permiso sin goce de sueldo', 'Permiso con goce de sueldo', 'Falta sin aviso', 'Otro'] }] },
+  'Anticipo': { campos: [{ id: 'monto', l: 'Monto en pesos', t: 'monto', ej: 'Ej. 100.000' }] },
+  'Ingreso': { sinTrabajador: true, campos: [{ id: 'nombre', l: 'Nombre completo', t: 'txt', ej: 'Ej. Ana Soto Rivas' }, { id: 'rut', l: 'RUT del trabajador', t: 'rut', ej: 'Con guion y dígito verificador' }, { id: 'fecha', l: 'Fecha de ingreso', t: 'fecha' }, { id: 'cargo', l: 'Cargo', t: 'txt', ej: 'Ej. vendedora' }], adj: 'Foto del carnet por ambos lados', importante: true },
+  'Término': { campos: [{ id: 'fecha', l: 'Último día de trabajo', t: 'fecha' }, { id: 'causal', l: 'Motivo', t: 'opc', ops: ['Renuncia', 'Mutuo acuerdo', 'Vencimiento del plazo', 'Necesidades de la empresa', 'Otro'] }], adj: 'Carta de renuncia o aviso de término' },
+  'Otro': { campos: [{ id: 'detalle', l: 'Cuéntanos qué pasó', t: 'txt', ej: 'Ej. cambio de jornada desde el lunes 17' }] }
+};
+
+/* ---------- Datos de partida (100 % ficticios) ---------- */
+function semilla() {
+  const mesVacio = () => ({ novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null });
+  return {
+    v: 4,
+    ajustes: { activacion: CONFIG.activacion },
+    /* Simula el maestro de empresas de Remutyme. */
+    remutyme: {
+      '99000100-6': { nombre: 'Panadería Los Aromos SpA', cartera: 'Cartera 1', correoRrhh: 'rrhh@aromos.demo', trabajadores: ['Juan Pérez Soto', 'María González Lara', 'Pedro Rojas Muñoz', 'Camila Fuentes Díaz'] },
+      '99000137-5': { nombre: 'Ferretería El Tornillo Feliz Ltda.', cartera: 'Cartera 2', correoRrhh: 'rrhh@tornillo.demo', trabajadores: ['Luis Araya Vega', 'Daniela Torres Pino'] },
+      '99000211-8': { nombre: 'Colegio Particular Rayito de Sol SpA', cartera: 'Cartera 1', correoRrhh: 'rrhh@rayito.demo', trabajadores: ['Paula Morales Ríos', 'Andrés Silva Contreras', 'Francisca Núñez Leiva'] },
+      '99000396-3': { nombre: 'Agrícola Los Tres Robles Ltda.', cartera: 'Cartera 3', correoRrhh: 'rrhh@tres-robles.demo', trabajadores: ['Rodrigo Castro Bravo', 'Valentina Herrera Soto'] },
+      /* Están en Remutyme pero aún no habilitadas en la app (para probar la carga masiva). */
+      '99000500-1': { nombre: 'Transportes Cordillera Sur SpA', cartera: 'Cartera 2', correoRrhh: 'rrhh@cordillera.demo', trabajadores: ['Felipe Ortiz Lagos', 'Javiera Pinto Rivas'] },
+      '99000612-1': { nombre: 'Clínica Dental Sonrisa Ltda.', cartera: 'Cartera 3', correoRrhh: 'rrhh@sonrisa.demo', trabajadores: ['Constanza Vidal Mora', 'Ignacio Reyes Campos'] }
+    },
+    /* Cuentas de la app por RUT de empresa. Nunca se guarda una clave: solo huella PBKDF2 + sal. */
+    cuentas: {
+      '99000100-6': cuentaNueva(),
+      '99000137-5': Object.assign(cuentaNueva(), { correo: 'contacto@tornillo.demo' }),
+      '99000211-8': cuentaNueva(),
+      '99000396-3': Object.assign(cuentaNueva(), { correo: 'contacto@tres-robles.demo' })
+    },
+    meses: {
+      '99000100-6': Object.assign(mesVacio(), { novedades: [
+        { id: 1, trabajador: 'Juan Pérez Soto', tipo: 'Horas extra', datos: { horas: 6 }, comentario: '', adjunto: null, ejemplo: true },
+        { id: 2, trabajador: 'María González Lara', tipo: 'Licencia médica', datos: { desde: '2026-11-03', hasta: '2026-11-07' }, comentario: '', adjunto: { nombre: 'licencia-ejemplo.pdf', kb: 240, mime: 'application/pdf' }, ejemplo: true }
+      ] }),
+      '99000137-5': Object.assign(mesVacio(), { sinNovedades: true, enviado: '2026-11-06T13:20:00' }),
+      '99000211-8': mesVacio(),
+      '99000396-3': Object.assign(mesVacio(), { novedades: [{ id: 3, trabajador: 'Valentina Herrera Soto', tipo: 'Vacaciones', datos: { desde: '2026-11-17', hasta: '2026-11-21' }, comentario: '', adjunto: null, ejemplo: true }], enviado: '2026-11-07T10:05:00', revisado: true, ingresado: true })
+    },
+    actividad: [],
+    recordados: {},
+    siguienteId: 10
+  };
+}
+function cuentaNueva() { return { habilitada: true, hash: null, sal: null, correo: '', intentos: 0, pideReset: false, link: null }; }
+
+/* ---------- Utilidades ---------- */
+const $ = id => document.getElementById(id);
+const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const copia = x => JSON.parse(JSON.stringify(x));
+const ahora = () => new Date().toISOString();
+function leerLS(k) { try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch (e) { return null; } }
+function escribirLS(k, v) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch (e) { return false; } }
+function normRut(t) { const x = String(t || '').replace(/[^0-9kK]/g, '').toUpperCase().replace(/^0+/, ''); return x.length > 1 && /^\d+$/.test(x.slice(0, -1)) ? x.slice(0, -1) + '-' + x.slice(-1) : ''; }
+function rutBonito(r) { const p = String(r).split('-'); return p.length === 2 ? Number(p[0]).toLocaleString('es-CL') + '-' + p[1] : String(r); }
+function dvValido(r) {
+  const p = String(r).split('-'); if (p.length !== 2 || !/^\d{6,9}$/.test(p[0])) return false;
+  let suma = 0, m = 2; for (let i = p[0].length - 1; i >= 0; i--) { suma += Number(p[0][i]) * m; m = m === 7 ? 2 : m + 1; }
+  const dv = 11 - (suma % 11); return (dv === 11 ? '0' : dv === 10 ? 'K' : String(dv)) === p[1];
+}
+const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function dLocal(iso) { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); }
+const fmtDia = d => d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
+const fmtCorta = iso => dLocal(iso).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }).replace('.', '');
+const fmtHora = iso => new Date(iso).toLocaleString('es-CL', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const fmtNum = n => Number(n).toLocaleString('es-CL', { maximumFractionDigits: 1 });
+const clp = n => '$' + Number(n).toLocaleString('es-CL');
+const diasEntre = (a, b) => Math.round((dLocal(b) - dLocal(a)) / 864e5) + 1;
+const plural = (n, uno, varios) => n === 1 ? '1 ' + uno : n + ' ' + varios;
+function aHex(a) { return Array.from(a, x => x.toString(16).padStart(2, '0')).join(''); }
+function azarHex(n) { const a = new Uint8Array(n); crypto.getRandomValues(a); return aHex(a); }
+async function huella(clave, salHex) {
+  const enc = new TextEncoder();
+  const base = await crypto.subtle.importKey('raw', enc.encode(clave), 'PBKDF2', false, ['deriveBits']);
+  const sal = new Uint8Array(salHex.match(/../g).map(h => parseInt(h, 16)));
+  const bits = await crypto.subtle.deriveBits({ name: 'PBKDF2', hash: 'SHA-256', salt: sal, iterations: 150000 }, base, 256);
+  return aHex(new Uint8Array(bits));
+}
+const espera = ms => new Promise(r => setTimeout(r, ms));
+
+function detalle(n) {
+  const d = n.datos || {};
+  switch (n.tipo) {
+    case 'Horas extra': return fmtNum(d.horas) + (d.horas === 1 ? ' hora' : ' horas');
+    case 'Bono': return clp(d.monto) + ' · ' + d.motivo;
+    case 'Licencia médica': case 'Vacaciones': return fmtCorta(d.desde) + ' al ' + fmtCorta(d.hasta) + ' (' + plural(diasEntre(d.desde, d.hasta), 'día', 'días') + ')';
+    case 'Ausencia': return fmtNum(d.dias) + (d.dias === 1 ? ' día' : ' días') + ' · ' + d.motivo;
+    case 'Anticipo': return clp(d.monto);
+    case 'Ingreso': return 'RUT ' + rutBonito(d.rut) + ' · desde el ' + fmtCorta(d.fecha) + ' · ' + d.cargo;
+    case 'Término': return 'Último día ' + fmtCorta(d.fecha) + ' · ' + d.causal;
+    default: return d.detalle || '';
+  }
+}
+
+/* ---------- Estado ---------- */
+let s = leerLS(LS);
+if (!s || s.v !== 4) s = semilla();
+const guardar = () => { if (!escribirLS(LS, s)) toast('No se pudo guardar en este navegador. La demo funciona, pero se perderá al recargar.'); };
+function registrar(rut, tipo, txt) { s.actividad.push({ t: ahora(), rut: rut || null, tipo, txt }); if (s.actividad.length > 300) s.actividad = s.actividad.slice(-300); }
+function modo() { return s.ajustes.activacion; }
+
+/* Convierte las claves ficticias de las empresas de prueba en huellas (una vez). */
+async function prepararSemillas() {
+  for (const rut of Object.keys(DEMO.semillas)) {
+    const c = s.cuentas[rut];
+    if (c && !c.hash && !c.semillaLista) { c.sal = azarHex(16); c.hash = await huella(DEMO.semillas[rut], c.sal); c.semillaLista = true; }
+  }
+  guardar();
+}
+let listo = Promise.resolve();
+
+let sesion = null;
+try { sesion = JSON.parse(sessionStorage.getItem(SS)); } catch (e) { sesion = null; }
+function guardarSesion() { try { if (sesion) sessionStorage.setItem(SS, JSON.stringify(sesion)); else sessionStorage.removeItem(SS); } catch (e) {} }
+
+/* Archivos: solo en memoria de esta pestaña. Nunca a localStorage (son datos personales). */
+const previas = new Map();
+const tickets = new Map();
+
+/* =============================================================================
+   srv — CONTRATO DEL SERVIDOR (simulado).
+   En Remutyme cada función será un endpoint con sesión real; aquí corre en el
+   navegador. La interfaz solo usa lo que estas funciones devuelven, así la vista
+   del cliente nunca recibe datos de otra empresa.
+   ============================================================================= */
+const GENERICO = 'El RUT o la clave no son correctos. Si tu empresa todavía no usa la app, pídele a tu encargada de remuneraciones en Contyme que la habilite.';
+const BLOQUEO = 'Por seguridad, el acceso quedó bloqueado tras ' + CONFIG.maxIntentos + ' intentos fallidos. Pídele a tu encargada en Contyme que restablezca la clave.';
+function nuevoTicket(rut, link) { const t = azarHex(16); tickets.set(t, { rut, link: link || null, vence: Date.now() + 10 * 60e3 }); return t; }
+function crearLink(rut) {
+  const c = s.cuentas[rut], e = s.remutyme[rut];
+  c.link = { token: azarHex(16), vence: new Date(Date.now() + CONFIG.horasLink * 3600e3).toISOString() };
+  registrar(rut, 'correo', 'Correo a RRHH de ' + e.nombre + ' (' + e.correoRrhh + '): link de un solo uso para crear la clave; vence en ' + CONFIG.horasLink + ' h.');
+  return c.link;
+}
+function soyCliente() { if (!sesion || sesion.rol !== 'cliente') throw new Error('Se requiere sesión de cliente'); return sesion.rut; }
+function soyAdmin() { if (!sesion || sesion.rol !== 'admin') throw new Error('Se requiere sesión de administrador'); }
+
+const srv = {
+  /* --- Acceso de empresas (públicos) --- */
+  async ingresar(rutTxt, clave) {
+    await listo;
+    const rut = normRut(rutTxt);
+    if (!rut || !dvValido(rut)) return { campo: 'rut', error: 'Revisa el RUT: falta un número o el dígito verificador no calza.' };
+    if (!clave) return { campo: 'clave', error: 'Escribe la clave.' };
+    if (!window.crypto || !crypto.subtle) return { error: 'Este navegador no permite entrar de forma segura. Prueba con Chrome, Edge, Safari o Firefox actualizados.' };
+    const c = s.cuentas[rut];
+    await espera(250); // en el servidor: misma demora exista o no la empresa
+    if (!c || !s.remutyme[rut]) return { campo: 'clave', error: GENERICO };
+    if (!c.habilitada) return { error: 'El acceso de esta empresa está bloqueado. Habla con tu encargada de remuneraciones en Contyme.' };
+    if (c.intentos >= CONFIG.maxIntentos) return { error: BLOQUEO };
+    const fallo = () => {
+      c.intentos++;
+      if (c.intentos >= CONFIG.maxIntentos) { registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': acceso bloqueado por ' + CONFIG.maxIntentos + ' intentos fallidos.'); guardar(); return { error: BLOQUEO }; }
+      guardar(); const quedan = CONFIG.maxIntentos - c.intentos;
+      return { campo: 'clave', error: GENERICO + (quedan <= 2 ? ' Te quedan ' + plural(quedan, 'intento', 'intentos') + '.' : '') };
+    };
+    if (!c.hash) {
+      if (modo() !== 'clave-inicial' || clave !== DEMO.claveInicial) return fallo();
+      c.intentos = 0; guardar();
+      return { paso: 'crear', ticket: nuevoTicket(rut), nombre: s.remutyme[rut].nombre, rut };
+    }
+    if (await huella(clave, c.sal) !== c.hash) return fallo();
+    c.intentos = 0; guardar();
+    return { ok: true, rut };
+  },
+  abrirLink(token) {
+    const rut = Object.keys(s.cuentas).find(r => s.cuentas[r].link && s.cuentas[r].link.token === token);
+    if (!rut) return { error: 'Este link ya se usó o no es válido. Pídele uno nuevo a tu encargada en Contyme.' };
+    const c = s.cuentas[rut];
+    if (new Date(c.link.vence) < new Date()) return { error: 'Este link venció. Pídele uno nuevo a tu encargada en Contyme.' };
+    if (!c.habilitada) return { error: 'El acceso de esta empresa está bloqueado. Habla con tu encargada de remuneraciones en Contyme.' };
+    return { ticket: nuevoTicket(rut, token), nombre: s.remutyme[rut].nombre, rut };
+  },
+  async crearClave(ticket, nueva, repite, correo) {
+    const t = tickets.get(ticket);
+    if (!t || t.vence < Date.now()) return { error: 'Pasó mucho rato. Vuelve a empezar el ingreso.', reiniciar: true };
+    const rut = t.rut, c = s.cuentas[rut], nom = s.remutyme[rut].nombre;
+    const debil = [DEMO.claveInicial, 'contyme', '12345678', 'password', 'qwerty', rut.split('-')[0]].map(x => x.toLowerCase());
+    if (nueva.length < CONFIG.claveMin) return { campo: 'nueva', error: 'La clave debe tener al menos ' + CONFIG.claveMin + ' caracteres.' };
+    if (!/[0-9]/.test(nueva) || !/[a-zA-ZñÑ]/.test(nueva)) return { campo: 'nueva', error: 'Usa letras y números.' };
+    if (debil.some(x => nueva.toLowerCase().includes(x))) return { campo: 'nueva', error: 'Es muy fácil de adivinar (no uses la clave inicial, el RUT ni "contyme"). Elige otra.' };
+    if (nueva !== repite) return { campo: 'repite', error: 'Las dos claves no son iguales.' };
+    correo = String(correo || '').trim().toLowerCase();
+    if (!RE_CORREO.test(correo)) return { campo: 'contacto', error: 'Escribe un correo de contacto válido, por ejemplo nombre@tuempresa.cl.' };
+    c.sal = azarHex(16); c.hash = await huella(nueva, c.sal); c.correo = correo; c.intentos = 0; c.pideReset = false; c.link = null;
+    tickets.delete(ticket);
+    registrar(rut, 'seguridad', nom + ' creó su clave' + (t.link ? ' con el link de un solo uso' : ' (venía de la clave inicial)') + '.');
+    guardar();
+    return { ok: true, rut };
+  },
+  pedirRestablecer(rutTxt) {
+    const rut = normRut(rutTxt);
+    if (!rut || !dvValido(rut)) return { campo: 'o-rut', error: 'Revisa el RUT: falta un número o el dígito verificador no calza.' };
+    const c = s.cuentas[rut];
+    if (c && s.remutyme[rut] && !c.pideReset) { c.pideReset = true; registrar(rut, 'correo', 'Aviso a la encargada de ' + s.remutyme[rut].cartera + ': ' + s.remutyme[rut].nombre + ' pidió restablecer su clave.'); guardar(); }
+    /* Misma respuesta siempre: no revela si el RUT es cliente de Contyme. */
+    return { ok: true };
+  },
+
+  /* --- Cliente (requiere sesión de cliente; solo su empresa) --- */
+  cli: {
+    datos() {
+      const rut = soyCliente(), e = s.remutyme[rut];
+      return { rut, nombre: e.nombre, trabajadores: e.trabajadores.slice(), mes: copia(s.meses[rut]), correo: s.cuentas[rut].correo };
+    },
+    guardarNovedad(n, idEditar) {
+      const rut = soyCliente(), m = s.meses[rut];
+      if (m.enviado) return { error: 'Ya enviaste este mes. Si te faltó algo, escríbele a tu encargada.' };
+      if (!TIPOS[n.tipo]) return { error: 'Tipo de novedad no válido.' };
+      const lista = s.remutyme[rut].trabajadores;
+      const nuevo = !!TIPOS[n.tipo].sinTrabajador || !lista.includes(n.trabajador);
+      const limpia = { trabajador: String(n.trabajador).slice(0, 120), tipo: n.tipo, datos: n.datos, comentario: String(n.comentario || '').slice(0, 500), adjunto: n.adjunto, trabajadorNuevo: nuevo && !TIPOS[n.tipo].sinTrabajador, ejemplo: false };
+      if (idEditar) {
+        const i = m.novedades.findIndex(x => x.id === idEditar); if (i < 0) return { error: 'Esa novedad ya no existe.' };
+        m.novedades[i] = Object.assign({ id: idEditar, creada: m.novedades[i].creada }, limpia, { editada: ahora() });
+        guardar(); return { ok: true, id: idEditar };
+      }
+      const id = s.siguienteId++;
+      m.novedades.push(Object.assign({ id, creada: ahora() }, limpia)); m.sinNovedades = false;
+      guardar(); return { ok: true, id };
+    },
+    quitar(id) {
+      const m = s.meses[soyCliente()]; if (m.enviado) return null;
+      const i = m.novedades.findIndex(x => x.id === id); if (i < 0) return null;
+      const [n] = m.novedades.splice(i, 1); guardar(); return { n, i };
+    },
+    restaurar(n, i) { const m = s.meses[soyCliente()]; if (m.enviado) return; m.novedades.splice(Math.min(i, m.novedades.length), 0, n); m.sinNovedades = false; guardar(); },
+    sinNovedades(v) { const m = s.meses[soyCliente()]; if (m.enviado || m.novedades.length) return; m.sinNovedades = v; guardar(); },
+    enviar() {
+      const rut = soyCliente(), m = s.meses[rut], e = s.remutyme[rut], c = s.cuentas[rut];
+      if (m.enviado) return { error: 'Ya estaba enviado.' };
+      if (!m.novedades.length && !m.sinNovedades) return { error: 'Agrega una novedad o marca que no hubo novedades.' };
+      m.enviado = ahora(); m.revisado = false; m.ingresado = false; m.nota = null;
+      const cuantas = m.novedades.length ? plural(m.novedades.length, 'novedad', 'novedades') : 'sin novedades';
+      registrar(rut, 'accion', e.nombre + ' envió ' + cuantas + ' de ' + CONFIG.periodo.mes + ' a la bandeja de RRHH.');
+      registrar(rut, 'correo', 'Aviso a la encargada de ' + e.cartera + ': «' + e.nombre + ' envió ' + cuantas + '». (El correo no lleva las novedades: solo avisa.)');
+      if (c.correo) registrar(rut, 'correo', 'Confirmación al cliente (' + c.correo + '): «Recibimos tus novedades de ' + CONFIG.periodo.mes + '».');
+      guardar(); return { ok: true };
+    }
+  },
+
+  /* --- Administración (requiere sesión de Contyme) --- */
+  adm: {
+    empresas() { soyAdmin(); return Object.keys(s.cuentas).filter(r => s.remutyme[r]); },
+    recordar(rut) {
+      soyAdmin(); const m = s.meses[rut]; if (!m || m.enviado) return;
+      s.recordados[rut] = ahora();
+      registrar(rut, 'correo', 'Recordatorio a ' + s.remutyme[rut].nombre + ' (' + (s.cuentas[rut].correo || s.remutyme[rut].correoRrhh) + '): «Recuerda enviar tus novedades de ' + CONFIG.periodo.mes + ' antes del ' + fmtCorta(CONFIG.periodo.plazo) + '».');
+      guardar();
+    },
+    marcar(rut, estado) {
+      soyAdmin(); const m = s.meses[rut]; if (!m || !m.enviado) return;
+      if (estado === 'revisada') { m.revisado = true; m.ingresado = false; }
+      else if (estado === 'ingresada') { m.revisado = true; m.ingresado = true; }
+      else { m.revisado = false; m.ingresado = false; }
+      registrar(rut, 'accion', s.remutyme[rut].nombre + ': marcada «' + (estado === 'por-revisar' ? 'Por revisar' : estado === 'revisada' ? 'Revisada' : 'Ingresada') + '».');
+      guardar();
+    },
+    reabrir(rut, nota) {
+      soyAdmin(); const m = s.meses[rut]; if (!m || !m.enviado) return;
+      m.enviado = null; m.revisado = false; m.ingresado = false; m.nota = nota;
+      registrar(rut, 'correo', 'A ' + s.remutyme[rut].nombre + ': «Contyme te pidió revisar tus novedades: ' + nota + '».');
+      guardar();
+    },
+    restablecer(rut) {
+      soyAdmin(); const c = s.cuentas[rut]; if (!c) return;
+      c.hash = null; c.sal = null; c.intentos = 0; c.pideReset = false; c.link = null;
+      registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': clave restablecida por Contyme.');
+      if (modo() === 'link') crearLink(rut);
+      guardar();
+    },
+    enviarLink(rut) { soyAdmin(); const c = s.cuentas[rut]; if (!c || c.hash) return; crearLink(rut); guardar(); },
+    alternarBloqueo(rut) {
+      soyAdmin(); const c = s.cuentas[rut]; c.habilitada = !c.habilitada;
+      registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': acceso ' + (c.habilitada ? 'habilitado' : 'bloqueado') + ' por Contyme.');
+      guardar(); return c.habilitada;
+    },
+    analizarCarga(texto) {
+      soyAdmin();
+      const r = { nuevas: [], ya: [], malos: [] }, vistos = new Set();
+      String(texto).split(/\r?\n/).forEach((linea, i) => {
+        if (!linea.trim()) return;
+        const celdas = linea.split(/[;,\t]/).map(x => x.trim().replace(/^"|"$/g, ''));
+        const celda = celdas.find(x => /\d/.test(x));
+        if (!celda) { if (i > 0) r.malos.push('Línea ' + (i + 1) + ': no tiene un RUT.'); return; } // la primera puede ser encabezado
+        const rut = normRut(celda);
+        if (!rut || !dvValido(rut)) { r.malos.push('Línea ' + (i + 1) + ': «' + celda.slice(0, 30) + '» no es un RUT válido.'); return; }
+        if (vistos.has(rut)) { r.repetidos = (r.repetidos || 0) + 1; return; } vistos.add(rut);
+        if (!s.remutyme[rut]) { r.malos.push('Línea ' + (i + 1) + ': ' + rutBonito(rut) + ' no está en Remutyme.'); return; }
+        const c = s.cuentas[rut];
+        if (c && c.habilitada) r.ya.push(rut); else r.nuevas.push(rut);
+      });
+      return r;
+    },
+    aplicarCarga(ruts) {
+      soyAdmin(); let n = 0;
+      ruts.forEach(rut => {
+        if (!s.remutyme[rut]) return;
+        if (s.cuentas[rut]) s.cuentas[rut].habilitada = true; else s.cuentas[rut] = cuentaNueva();
+        if (!s.meses[rut]) s.meses[rut] = { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null };
+        registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': habilitada en la app (carga masiva).');
+        if (modo() === 'link' && !s.cuentas[rut].hash) crearLink(rut);
+        n++;
+      });
+      guardar(); return n;
+    },
+    cambiarActivacion(v) { soyAdmin(); if (v === 'clave-inicial' || v === 'link') { s.ajustes.activacion = v; registrar(null, 'accion', 'Demo: forma de activación cambiada a «' + (v === 'link' ? 'link de un solo uso' : 'clave inicial genérica') + '».'); guardar(); } }
+  }
+};
+
+/* ---------- Estado de pantalla ---------- */
+const uiInicial = () => ({ paso: 'rut', ticket: null, crearPara: null, form: {}, err: null, aviso: '', cargando: false, tab: 'mes', tipo: null, editando: null, archivo: null, admTab: 'bandeja', sel: null, filtro: 'todas', buscar: '', carga: null, ultimoLink: null, actFiltro: 'todo', foco: null });
+let ui = uiInicial();
+const val = id => ui.form[id] == null ? '' : ui.form[id];
+
+/* ---------- Componentes ---------- */
+const ICO = {
+  x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  lapiz: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
+  check: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  checkChico: '<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
+  bajar: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>',
+  camara: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>',
+  reloj: '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+  cal: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/></svg>',
+  mas: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>',
+  doc: '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6M9 14h6M9 18h4"/></svg>'
+};
+function errDe(id) { return ui.err && ui.err.campo === id ? ui.err.msg : ''; }
+function aria(id, ayuda) {
+  const err = errDe(id), desc = [ayuda ? id + '-ay' : '', err ? id + '-err' : ''].filter(Boolean).join(' ');
+  return (err ? ' aria-invalid="true"' : '') + (desc ? ' aria-describedby="' + desc + '"' : '');
+}
+function pieCampo(id, ayuda) { const err = errDe(id); return (ayuda ? '<span class="sub" id="' + id + '-ay">' + ayuda + '</span>' : '') + (err ? '<span class="err-campo" id="' + id + '-err">' + esc(err) + '</span>' : ''); }
+function input(id, label, o) {
+  o = o || {};
+  const control = '<input id="' + id + '" name="' + id + '" type="' + (o.type || 'text') + '"' + (o.ac ? ' autocomplete="' + o.ac + '"' : ' autocomplete="off"') + (o.im ? ' inputmode="' + o.im + '"' : '') +
+    (o.ph ? ' placeholder="' + esc(o.ph) + '"' : '') + (o.max ? ' maxlength="' + o.max + '"' : '') + (o.extra || '') + ' value="' + esc(val(id)) + '"' + aria(id, o.ayuda) + '>';
+  const cuerpo = o.pass ? '<div class="pass">' + control + '<button type="button" class="ver" data-a="ver" data-v="' + id + '" aria-pressed="false" aria-label="Mostrar la clave">Mostrar</button></div>' : control;
+  return '<div class="campo"><label for="' + id + '">' + esc(label) + '</label>' + cuerpo + pieCampo(id, o.ayuda) + (o.despues || '') + '</div>';
+}
+function select(id, label, opciones, o) {
+  o = o || {}; const v = opciones.some(op => op[0] === val(id)) ? val(id) : '';
+  return '<div class="campo"><label for="' + id + '">' + esc(label) + '</label><select id="' + id + '" name="' + id + '"' + aria(id, o.ayuda) + '>' +
+    '<option value=""' + (v ? '' : ' selected') + ' disabled>' + esc(o.vacia || 'Elige una opción') + '</option>' +
+    opciones.map(op => '<option value="' + esc(op[0]) + '"' + (v === op[0] ? ' selected' : '') + '>' + esc(op[1]) + '</option>').join('') + '</select>' + pieCampo(id, o.ayuda) + '</div>';
+}
+function errorGeneral() { return ui.err && !ui.err.campo ? '<div class="error" role="alert">' + esc(ui.err.msg) + '</div>' : ''; }
+function demoChip(a, v, txt) { return '<button type="button" class="chip" data-a="' + a + '" data-v="' + esc(v) + '">' + esc(txt) + '</button>'; }
+
+/* ---------- Vista: ingreso ---------- */
+function vistaLogin() {
+  let cuerpo;
+  if (ui.paso === 'crear') {
+    const p = ui.crearPara;
+    cuerpo = '<form id="f-crear" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Crea tu clave</h2>' +
+      '<p class="sub">Es la primera vez que <b>' + esc(p.nombre) + '</b> entra. Crea una clave propia: desde ahora entras con el RUT y esta clave. Contyme nunca te la va a pedir ni mandar por correo.</p>' +
+      '<input class="sr" type="text" autocomplete="username" value="' + esc(rutBonito(p.rut)) + '" readonly tabindex="-1" aria-hidden="true">' +
+      input('nueva', 'Nueva clave', { type: 'password', ac: 'new-password', pass: true, ayuda: 'Mínimo ' + CONFIG.claveMin + ' caracteres, con letras y números.' }) +
+      input('repite', 'Repite la clave', { type: 'password', ac: 'new-password', pass: true }) +
+      input('contacto', 'Correo de contacto', { type: 'email', ac: 'email', im: 'email', ph: 'nombre@tuempresa.cl', ayuda: 'Ahí te llega la confirmación de cada envío.' }) +
+      errorGeneral() +
+      '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Guardando…' : 'Guardar y entrar') + '</button>' +
+      '<button type="button" class="btn-link" data-a="paso" data-v="rut">Cancelar</button></form>';
+  } else if (ui.paso === 'olvide') {
+    cuerpo = '<form id="f-olvide" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">¿Olvidaste la clave?</h2>' +
+      '<p class="sub">Por seguridad, Contyme nunca manda claves por correo ni por mensaje. Le avisamos a tu encargada y ella la restablece; ' +
+      (modo() === 'link' ? 'te llegará un link para crear una nueva.' : 'después entras con la clave inicial y creas una nueva.') + '</p>' +
+      input('o-rut', 'RUT de la empresa', { ac: 'username', ph: 'Ej. 99.000.100-6' }) + errorGeneral() +
+      (ui.aviso ? '<div class="nota nota-info" role="status">' + esc(ui.aviso) + '</div>' : '<button type="submit" class="btn btn-pri">Avisar a Contyme</button>') +
+      '<button type="button" class="btn-link" data-a="paso" data-v="rut">Volver al ingreso</button></form>';
+  } else if (ui.paso === 'contyme') {
+    cuerpo = '<div class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Equipo Contyme</h2>' +
+      '<p class="sub">Los administradores entran con su cuenta de Google de Contyme, igual que en Remutyme. En la versión real esta pantalla vive dentro de Remutyme y no se publica en la app de los clientes.</p>' +
+      '<button type="button" class="btn btn-pri" data-a="entrar-admin">Entrar con Google (simulado)</button>' +
+      (CONFIG.demo ? '<p class="sub">En la demo entras como <b>' + esc(DEMO.admin) + '</b>, sin verificar nada.</p>' : '') +
+      '<button type="button" class="btn-link" data-a="paso" data-v="rut">Volver al ingreso de empresas</button></div>';
+  } else {
+    const ayudaClave = modo() === 'link' ? '¿Primera vez? Abre el link que te llegó por correo y crea ahí tu clave.' : '¿Primera vez? Usa la clave inicial que te entregó Contyme.';
+    let demo = '';
+    if (CONFIG.demo) {
+      demo = modo() === 'link'
+        ? '<div class="demo"><span class="sub"><b>Para probar</b> (datos ficticios · modo <b>link de un solo uso</b>):</span><div class="demo-chips">' +
+          demoChip('demo-link', '99000100-6', 'Panadería · abrir su link') + demoChip('demo-fill', '99000396-3', 'Agrícola · ya registrada') + demoChip('demo-fill', '99000999-6', 'RUT no habilitado') +
+          '</div><span class="sub">La Agrícola entra con <b>' + esc(DEMO.semillas['99000396-3']) + '</b>. En este modo la clave inicial no sirve.</span></div>'
+        : '<div class="demo"><span class="sub"><b>Para probar</b> (datos ficticios · modo <b>clave inicial</b>):</span><div class="demo-chips">' +
+          demoChip('demo-fill', '99000100-6', 'Panadería · primera vez') + demoChip('demo-fill', '99000396-3', 'Agrícola · ya registrada') + demoChip('demo-fill', '99000999-6', 'RUT no habilitado') +
+          '</div><span class="sub">Los botones llenan RUT y clave. Clave inicial de la demo: <b>' + esc(DEMO.claveInicial) + '</b>; la Agrícola ya creó la suya: <b>' + esc(DEMO.semillas['99000396-3']) + '</b>.</span></div>';
+    }
+    cuerpo = '<form id="f-ingreso" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Ingresa con el RUT de tu empresa</h2>' +
+      (ui.aviso ? '<div class="nota nota-info" role="status">' + esc(ui.aviso) + '</div>' : '') +
+      input('rut', 'RUT de la empresa', { ac: 'username', ph: 'Ej. 99.000.100-6', ayuda: 'Con o sin puntos, con guion y dígito verificador.' }) +
+      input('clave', 'Clave', { type: 'password', ac: 'current-password', pass: true, ayuda: ayudaClave, despues: '<span class="err-campo" id="caps" hidden>Tienes activadas las MAYÚSCULAS.</span>' }) +
+      errorGeneral() +
+      '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Entrando…' : 'Entrar') + '</button>' +
+      '<button type="button" class="btn-link" data-a="paso" data-v="olvide">Olvidé mi clave</button>' + demo + '</form>';
+  }
+  return '<div class="login"><header class="login-top gutter"><span class="eyebrow">Contyme · Remuneraciones</span><h1>Novedades</h1><p>Envía a Contyme lo que pasó con tus trabajadores este mes para hacer las liquidaciones.</p></header>' +
+    '<main id="principal">' + cuerpo + '</main>' +
+    (ui.paso === 'rut' ? '<p class="pie-login"><button type="button" class="btn-link chico" data-a="paso" data-v="contyme">Acceso equipo Contyme</button></p>' : '') + '</div>';
+}
+
+/* ---------- Vista: cliente ---------- */
+function estadoCliente(m) {
+  if (m.ingresado) return ['Contyme ya está haciendo tus liquidaciones', 'En proceso', 'p-ok'];
+  if (m.enviado) return ['Enviadas el ' + fmtDia(new Date(m.enviado)), 'Enviadas', 'p-ok'];
+  if (m.nota) return ['Contyme te pidió revisar algo', 'Por corregir', 'p-crit'];
+  if (m.sinNovedades) return ['Marcaste que no hubo novedades', 'Falta enviar', 'p-warn'];
+  if (!m.novedades.length) return ['Aún no agregas novedades', 'Sin enviar', 'p-warn'];
+  return ['Borrador: aún no se envía', 'Sin enviar', 'p-warn'];
+}
+function plazoTxt() {
+  const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  const p = dLocal(CONFIG.periodo.plazo), dias = Math.round((p - hoy) / 864e5);
+  if (dias < 0) return 'El plazo venció el ' + fmtDia(p) + '. Envía igual lo antes posible.';
+  if (dias === 0) return 'Plazo: hoy.';
+  if (dias === 1) return 'Plazo: mañana, ' + fmtDia(p) + '.';
+  return 'Plazo: ' + fmtDia(p) + ' (quedan ' + dias + ' días).';
+}
+function itemNovedad(n, o) {
+  o = o || {};
+  const def = TIPOS[n.tipo] || {};
+  let adj = '';
+  if (n.adjunto) { const u = previas.get(n.id); adj = '<div class="adj">' + (u && /^image\//.test(n.adjunto.mime) ? '<img src="' + esc(u) + '" alt="Respaldo de ' + esc(n.trabajador) + '">' : '') + 'Respaldo: ' + esc(n.adjunto.nombre) + '</div>'; }
+  const marcas = [];
+  if (n.ejemplo) marcas.push('<span class="pill p-neutro">Ejemplo</span>');
+  if (def.importante && !n.adjunto) marcas.push('<span class="pill p-warn">Falta respaldo</span>');
+  if (n.trabajadorNuevo) marcas.push('<span class="pill p-info">No está en la lista</span>');
+  if (n.tipo === 'Ingreso') marcas.push('<span class="pill p-info">Trabajador nuevo</span>');
+  const acc = o.editable ? '<div class="nov-acc"><button type="button" class="icon-btn" data-a="editar" data-v="' + n.id + '" aria-label="Editar la novedad de ' + esc(n.trabajador) + '">' + ICO.lapiz + '</button>' +
+    '<button type="button" class="icon-btn" data-a="quitar" data-v="' + n.id + '" aria-label="Quitar la novedad de ' + esc(n.trabajador) + '">' + ICO.x + '</button></div>' : '';
+  return '<li class="nov"><span class="avatar" aria-hidden="true">' + esc(n.trabajador.charAt(0)) + '</span><div class="nov-txt">' +
+    '<strong>' + esc(n.trabajador) + '</strong><span class="nov-tipo">' + esc(n.tipo) + '</span><span>' + esc(detalle(n)) + '</span>' +
+    (n.comentario ? '<span>«' + esc(n.comentario) + '»</span>' : '') + adj + (marcas.length ? '<div class="marcas">' + marcas.join('') + '</div>' : '') + '</div>' + acc + '</li>';
+}
+function cliMes(d) {
+  const m = d.mes, n = m.novedades.length;
+  if (m.enviado) return cliEnviado(d);
+  const nota = m.nota ? '<div class="nota nota-crit" role="status"><strong>Contyme te pidió revisar tu envío</strong><span>«' + esc(m.nota) + '»</span><span>Corrige lo que haga falta y vuelve a enviar.</span></div>' : '';
+  const lista = n ? '<ul class="lista">' + m.novedades.map(x => itemNovedad(x, { editable: true })).join('') + '</ul>'
+    : (m.sinNovedades ? '<div class="vacio"><strong>Sin novedades este mes</strong><span class="sub">Haremos las liquidaciones igual que el mes pasado.</span><button type="button" class="btn-link" data-a="sin-nov" data-v="no">Me equivoqué, sí hubo novedades</button></div>'
+      : '<div class="vacio"><strong>Todavía no hay novedades</strong><span class="sub">Agrega una por cada cosa que pasó: horas extra, una licencia, un bono…</span></div>');
+  const puede = n || m.sinNovedades;
+  return nota + '<div class="fila-titulo"><h2 id="titulo" tabindex="-1">Este mes</h2><span class="sub">' + plural(n, 'novedad', 'novedades') + ' en borrador</span></div>' + lista +
+    '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' +
+    (n || m.sinNovedades ? '' : '<button type="button" class="btn-link" data-a="sin-nov" data-v="si">No tuve novedades este mes</button>') +
+    '<button type="button" class="btn btn-pri" data-a="enviar"' + (puede ? '' : ' disabled aria-describedby="envio-ay"') + '>Enviar a Contyme</button>' +
+    '<p class="sub centro" id="envio-ay">' + (puede ? 'Al enviar, tus novedades quedan en la bandeja de Remuneraciones de Contyme y le avisamos a tu encargada. Hasta entonces es solo un borrador.' : 'Para enviar, agrega una novedad o marca que no hubo novedades.') + '</p>';
+}
+function cliEnviado(d) {
+  const m = d.mes, n = m.novedades.length;
+  const pasos = [['Enviadas', fmtDia(new Date(m.enviado)), true], ['Revisadas por Contyme', m.revisado ? 'Listo' : 'Te escribimos si falta algo', m.revisado],
+    ['Ingresadas', m.ingresado ? 'Ya estamos haciendo tus liquidaciones' : 'Pendiente', m.ingresado], ['Liquidaciones listas', 'Aparecen en «Liquidaciones» para descargar', false]];
+  return '<div class="aviso-ok" role="status">' + ICO.check + '<div><strong>' + (n ? 'Enviaste ' + plural(n, 'novedad', 'novedades') : 'Avisaste que no hubo novedades') + '</strong>' +
+    '<div>Quedó en la bandeja de Remuneraciones de Contyme y tu encargada recibió un aviso.' + (d.correo ? ' Te mandamos la confirmación a ' + esc(d.correo) + '.' : '') + '</div></div></div>' +
+    '<h2 id="titulo" tabindex="-1" style="font-size:19px">En qué va</h2><ol class="pasos">' + pasos.map((p, i) =>
+      '<li class="paso' + (p[2] ? ' hecho' : '') + '"><div class="paso-marca"><span class="punto">' + (p[2] ? ICO.checkChico : '') + '</span>' + (i < pasos.length - 1 ? '<span class="linea"></span>' : '') + '</div>' +
+      '<div class="paso-txt"><strong>' + p[0] + '<span class="sr">' + (p[2] ? ' (hecho)' : ' (pendiente)') + '</span></strong><span>' + esc(p[1]) + '</span></div></li>').join('') + '</ol>' +
+    (n ? '<h2 style="font-size:19px">Lo que enviaste</h2><ul class="lista">' + m.novedades.map(x => itemNovedad(x)).join('') + '</ul>' : '') +
+    '<p class="sub centro">¿Te faltó algo? Escríbele a tu encargada de remuneraciones y ella reabre tu envío.</p>';
+}
+function cliNueva(d) {
+  if (d.mes.enviado) return '<div class="vacio"><h2 id="titulo" tabindex="-1" style="font-size:18px">Ya enviaste ' + esc(CONFIG.periodo.mes) + '</h2><span class="sub">Si te faltó algo, escríbele a tu encargada y ella reabre tu envío.</span></div>';
+  const editando = ui.editando != null, def = ui.tipo ? TIPOS[ui.tipo] : null;
+  let html = '<div class="fila-titulo"><h2 id="titulo" tabindex="-1" style="font-size:21px">' + (editando ? 'Editar novedad' : 'Nueva novedad') + '</h2></div><form id="f-nov" novalidate style="display:flex;flex-direction:column;gap:20px">' +
+    '<fieldset><legend><span class="num" aria-hidden="true">1</span>¿Qué pasó?</legend><div class="tipos">' +
+    Object.keys(TIPOS).map(k => '<button type="button" data-a="tipo" data-v="' + esc(k) + '" aria-pressed="' + (k === ui.tipo) + '">' + esc(k) + '</button>').join('') + '</div>' +
+    (errDe('tipo') ? '<span class="err-campo" role="alert">' + esc(errDe('tipo')) + '</span>' : '') + '</fieldset>';
+  if (def) {
+    let n = 2;
+    if (!def.sinTrabajador) {
+      html += '<fieldset><legend><span class="num" aria-hidden="true">' + (n++) + '</span>¿A quién?</legend>' +
+        select('trabajador', 'Trabajador', d.trabajadores.map(x => [x, x]).concat([['__otro', 'Otro (no está en la lista)']]), { vacia: 'Elige un trabajador' }) +
+        (val('trabajador') === '__otro' ? '<div style="margin-top:10px">' + input('trab-otro', 'Nombre del trabajador', { ph: 'Nombre y apellido', max: 120, ayuda: 'Contyme lo revisa porque no aparece en tu nómina.' }) + '</div>' : '') + '</fieldset>';
+    }
+    const campos = def.campos.map(c => campoTipo(c));
+    const fechas = def.campos.length === 2 && def.campos.every(c => c.t === 'fecha');
+    html += '<fieldset><legend><span class="num" aria-hidden="true">' + (n++) + '</span>Detalle</legend><div style="display:flex;flex-direction:column;gap:12px">' +
+      (fechas ? '<div class="dos-col">' + campos.join('') + '</div>' : campos.join('')) + '</div></fieldset>';
+    if (def.adj) {
+      const a = ui.archivo;
+      html += '<fieldset><legend><span class="num" aria-hidden="true">' + (n++) + '</span>Respaldo' + (def.importante ? '' : ' (opcional)') + '</legend>' +
+        (a ? '<div class="archivo-listo">' + (a.url && /^image\//.test(a.mime) ? '<img src="' + esc(a.url) + '" alt="Vista previa del respaldo">' : ICO.doc) + '<span>' + esc(a.nombre) + ' · ' + fmtNum(a.kb) + ' KB</span>' +
+          '<button type="button" class="btn btn-sec btn-chico" data-a="quitar-archivo">Cambiar</button></div>'
+          : '<label class="foto">' + ICO.camara + '<span>' + esc(def.adj) + '</span><input id="archivo" type="file" accept="image/*,application/pdf"' + aria('archivo', 'archivo-ay2') + '></label>' +
+            '<span class="sub" id="archivo-ay2-ay">Foto o PDF de hasta ' + CONFIG.maxArchivoMB + ' MB.' + (def.importante ? ' Si no la tienes ahora, puedes guardar igual y Contyme te la pedirá.' : '') + '</span>' + pieCampo('archivo')) + '</fieldset>';
+    }
+    html += '<div class="campo"><label for="comentario">Comentario para Contyme (opcional)</label><textarea id="comentario" rows="3" maxlength="500" placeholder="Algo que debamos saber"' + aria('comentario') + '>' + esc(val('comentario')) + '</textarea>' +
+      '<span class="contador" id="contador" aria-live="off">' + String(val('comentario')).length + '/500</span>' + pieCampo('comentario') + '</div>';
+  }
+  html += errorGeneral() + (def ? '<button type="submit" class="btn btn-pri">' + (editando ? 'Guardar cambios' : 'Guardar novedad') + '</button>' : '') +
+    '<button type="button" class="btn-link" data-a="tab" data-v="mes">Cancelar</button></form>';
+  return html;
+}
+function campoTipo(c) {
+  const id = 'c-' + c.id;
+  if (c.t === 'opc') return select(id, c.l, c.ops.map(x => [x, x]));
+  if (c.t === 'fecha') return input(id, c.l, { type: 'date', extra: ' min="2025-01-01" max="2027-12-31"' });
+  if (c.t === 'num') return input(id, c.l, { im: 'decimal', ph: c.ej, ayuda: c.ayuda, max: 6 });
+  if (c.t === 'monto') return input(id, c.l, { im: 'numeric', ph: c.ej, max: 14, extra: ' data-monto="1"' });
+  if (c.t === 'rut') return input(id, c.l, { ph: c.ej, max: 14, extra: ' data-rut="1"' });
+  return input(id, c.l, { ph: c.ej, max: 200 });
+}
+function cliHistorial(d) {
+  return '<h2 id="titulo" tabindex="-1" style="font-size:21px">Liquidaciones</h2><p class="sub">Las de cada mes quedan acá en PDF. <b>En esta demo son de ejemplo</b> y no se descarga nada.</p>' +
+    '<ul class="lista">' + ['Octubre 2026', 'Septiembre 2026', 'Agosto 2026'].map(x =>
+      '<li class="mes"><span><strong>' + x + '</strong><br><span class="sub">' + plural(d.trabajadores.length, 'trabajador', 'trabajadores') + ' · PDF</span></span>' +
+      '<button type="button" class="icon-btn" style="color:var(--brand-ink)" data-a="pdf" data-v="' + x + '" aria-label="Descargar liquidaciones de ' + x + '">' + ICO.bajar + '</button></li>').join('') + '</ul>';
+}
+function vistaCliente() {
+  const d = srv.cli.datos(), e = estadoCliente(d.mes), borr = d.mes.enviado ? 0 : d.mes.novedades.length;
+  const cuerpo = ui.tab === 'nueva' ? cliNueva(d) : ui.tab === 'historial' ? cliHistorial(d) : cliMes(d);
+  const tab = (id, txt, svg, badge) => '<button type="button" data-a="tab" data-v="' + id + '"' + (ui.tab === id ? ' aria-current="page"' : '') + '>' + svg + txt +
+    (badge ? '<span class="badge" aria-label="' + plural(badge, 'novedad sin enviar', 'novedades sin enviar') + '">' + badge + '</span>' : '') + '</button>';
+  return '<div class="app"><header class="top gutter"><div class="top-row"><div style="min-width:0"><div class="eyebrow">Contyme · Remuneraciones</div><div class="empresa">' + esc(d.nombre) + '</div></div>' +
+    '<button type="button" class="salir" data-a="salir">Salir</button></div>' +
+    '<h1>Novedades de ' + esc(CONFIG.periodo.mes) + '</h1><p>Cuéntanos qué pasó con tus trabajadores este mes. Con esto hacemos las liquidaciones.</p>' +
+    '<div class="estado"><span>' + esc(e[0]) + '</span><span class="pill ' + e[2] + '">' + e[1] + '</span></div>' +
+    (d.mes.enviado ? '' : '<div class="plazo">' + ICO.reloj + '<span>' + esc(plazoTxt()) + '</span></div>') + '</header>' +
+    '<main id="principal" class="cli gutter entra">' + cuerpo + '</main>' +
+    '<nav class="tabs" aria-label="Secciones">' + tab('mes', 'Este mes', ICO.cal, borr) + tab('nueva', ui.editando != null ? 'Editar' : 'Nueva', ICO.mas) + tab('historial', 'Liquidaciones', ICO.doc) + '</nav></div>';
+}
+
+/* ---------- Vista: administración ---------- */
+function estadoAdm(rut) {
+  const m = s.meses[rut];
+  if (!m || !m.enviado) return ['No ha enviado', 'p-crit'];
+  if (m.ingresado) return ['Ingresada', 'p-ok'];
+  if (m.revisado) return ['Revisada', 'p-info'];
+  return ['Por revisar', 'p-warn'];
+}
+function estadoCuenta(c) {
+  if (!c.habilitada) return ['Bloqueada', 'p-crit'];
+  if (c.intentos >= CONFIG.maxIntentos) return ['Bloqueada por intentos', 'p-crit'];
+  if (!c.hash) return [c.link ? 'Link enviado' : 'Sin activar', 'p-warn'];
+  return ['Activa', 'p-ok'];
+}
+const ESTADOS = ['No ha enviado', 'Por revisar', 'Revisada', 'Ingresada'];
+function admBandeja() {
+  const ruts = srv.adm.empresas();
+  const cuenta = est => ruts.filter(r => estadoAdm(r)[0] === est).length;
+  const q = ui.buscar.trim().toLowerCase(), qRut = q.replace(/[^0-9k]/g, '');
+  const vis = ruts.filter(r => (ui.filtro === 'todas' || estadoAdm(r)[0] === ui.filtro) &&
+    (!q || s.remutyme[r].nombre.toLowerCase().includes(q) || (qRut.length >= 3 && r.toLowerCase().replace('-', '').includes(qRut))));
+  const sel = ui.sel && s.cuentas[ui.sel] ? ui.sel : null;
+  const pendientes = ruts.filter(r => estadoAdm(r)[0] === 'No ha enviado' && s.cuentas[r].habilitada);
+  const filas = vis.map(r => {
+    const m = s.meses[r], e = estadoAdm(r), def = x => TIPOS[x.tipo] || {};
+    const faltan = m && m.enviado ? m.novedades.filter(x => def(x).importante && !x.adjunto).length : 0;
+    const nov = m && m.enviado ? (m.novedades.length ? String(m.novedades.length) : 'Sin novedades') + (faltan ? ' <span class="pill p-warn">' + plural(faltan, 'sin respaldo', 'sin respaldo') + '</span>' : '') : '<span class="sub">—</span>';
+    const env = m && m.enviado ? esc(fmtHora(m.enviado)) : (s.recordados[r] ? '<span class="sub">Recordado ' + esc(fmtHora(s.recordados[r])) + '</span> ' : '') +
+      '<button type="button" class="btn btn-sec btn-chico" data-a="recordar" data-v="' + r + '">' + (s.recordados[r] ? 'Recordar otra vez' : 'Recordar') + '</button>';
+    return '<tr' + (r === sel ? ' class="sel"' : '') + '><td data-l="Empresa"><button type="button" class="fila-btn" data-a="sel" data-v="' + r + '"' + (r === sel ? ' aria-current="true"' : '') + '>' + esc(s.remutyme[r].nombre) + '</button><div class="sub mono">' + rutBonito(r) + ' · ' + esc(s.remutyme[r].cartera) + '</div></td>' +
+      '<td data-l="Estado"><span class="pill ' + e[1] + '">' + e[0] + '</span></td><td data-l="Novedades">' + nov + '</td><td data-l="Enviado">' + env + '</td></tr>';
+  }).join('');
+  const tabla = vis.length ? '<div class="ancho tabla-caja"><table class="tabla-resp"><caption class="sr">Empresas y estado de sus novedades de ' + esc(CONFIG.periodo.mes) + '</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Estado</th><th scope="col">Novedades</th><th scope="col">Enviado</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+    : '<div class="ancho vacio"><strong>Ninguna empresa calza con el filtro</strong><button type="button" class="btn-link" data-a="limpiar-filtro">Ver todas</button></div>';
+  return '<div class="fila-titulo"><h1 id="titulo" tabindex="-1" style="font-size:24px">Bandeja de novedades</h1><span class="sub">' + esc(CONFIG.periodo.nombre) + ' · plazo ' + esc(fmtCorta(CONFIG.periodo.plazo)) + '</span></div>' +
+    '<div class="resumen" role="group" aria-label="Filtrar por estado">' +
+    '<button type="button" class="dato" data-a="filtro" data-v="todas" aria-pressed="' + (ui.filtro === 'todas') + '"><span class="sub">Todas</span><b>' + ruts.length + '</b></button>' +
+    ESTADOS.map(est => '<button type="button" class="dato" data-a="filtro" data-v="' + est + '" aria-pressed="' + (ui.filtro === est) + '"><span class="sub">' + est + '</span><b' + (est === 'No ha enviado' && cuenta(est) ? ' style="color:var(--crit-fg)"' : '') + '>' + cuenta(est) + '</b></button>').join('') + '</div>' +
+    '<div class="barra-herr"><div class="campo"><label for="buscar">Buscar empresa</label><input id="buscar" type="search" autocomplete="off" placeholder="Nombre o RUT" value="' + esc(ui.buscar) + '"></div>' +
+    (pendientes.length ? '<button type="button" class="btn btn-sec btn-chico" style="min-height:48px" data-a="recordar-todas">Recordar a ' + (pendientes.length === 1 ? 'la empresa que no ha enviado' : 'las ' + pendientes.length + ' que no han enviado') + '</button>' : '') + '</div>' +
+    '<div class="dos">' + tabla + '<div class="angosto" id="detalle">' + admDetalle(sel) + '</div></div>';
+}
+function admDetalle(sel) {
+  if (!sel) return '<div class="caja"><h2 style="font-size:17px">Elige una empresa</h2><p class="sub">Toca el nombre de una empresa para ver sus novedades.</p></div>';
+  const m = s.meses[sel], e = s.remutyme[sel], c = s.cuentas[sel], est = estadoAdm(sel);
+  let cuerpo;
+  if (!m.enviado) {
+    cuerpo = '<div class="vacio"><strong>Sin envío todavía</strong><span class="sub">' + (m.novedades.length ? 'Tiene ' + plural(m.novedades.length, 'novedad', 'novedades') + ' en borrador; Contyme no las ve hasta que envíe.' : 'No ha agregado nada.') + '</span></div>' +
+      (m.nota ? '<div class="nota nota-warn"><strong>Le pediste revisar:</strong><span>«' + esc(m.nota) + '»</span></div>' : '');
+  } else {
+    cuerpo = (m.novedades.length ? '<ul class="lista">' + m.novedades.map(x => itemNovedad(x)).join('') + '</ul>' : '<div class="vacio"><strong>Sin novedades</strong><span class="sub">El cliente confirmó que no hubo cambios.</span></div>') +
+      '<div class="acciones">' +
+      (m.revisado ? '' : '<button type="button" class="btn btn-sec" data-a="marcar" data-v="revisada">Marcar revisada</button>') +
+      (m.ingresado ? '' : '<button type="button" class="btn btn-pri" data-a="marcar" data-v="ingresada">Marcar ingresada</button>') + '</div>' +
+      '<div class="acciones">' + (m.novedades.length ? '<button type="button" class="btn btn-sec btn-chico" data-a="copiar">Copiar para Excel</button>' : '') +
+      (m.ingresado ? '' : '<button type="button" class="btn btn-sec btn-chico" data-a="reabrir">Pedir corrección</button>') +
+      (m.revisado ? '<button type="button" class="btn-link" data-a="marcar" data-v="' + (m.ingresado ? 'revisada' : 'por-revisar') + '">Deshacer «' + (m.ingresado ? 'Ingresada' : 'Revisada') + '»</button>' : '') + '</div>' +
+      '<p class="sub">Lo que marques lo ve el cliente en «En qué va».</p>';
+  }
+  return '<div class="caja"><div><h2 id="det-titulo" tabindex="-1" style="font-size:18px">' + esc(e.nombre) + '</h2><span class="sub mono">' + rutBonito(sel) + ' · ' + esc(e.cartera) + (c.correo ? ' · ' + esc(c.correo) : '') + '</span></div>' +
+    '<div><span class="pill ' + est[1] + '">' + est[0] + '</span> <span class="sub">' + (m.enviado ? 'Enviado el ' + esc(fmtHora(m.enviado)) : 'Aún no envía ' + esc(CONFIG.periodo.mes)) + '</span></div>' + cuerpo + '</div>';
+}
+function admEmpresas() {
+  const ruts = srv.adm.empresas(), lnk = modo() === 'link';
+  const filas = ruts.map(r => {
+    const c = s.cuentas[r], e = estadoCuenta(c), acc = [];
+    if (c.hash || c.intentos) acc.push('<button type="button" class="btn btn-sec btn-chico" data-a="restablecer" data-v="' + r + '">Restablecer clave</button>');
+    if (lnk && !c.hash && c.habilitada && c.intentos < CONFIG.maxIntentos) acc.push('<button type="button" class="btn btn-sec btn-chico" data-a="enviar-link" data-v="' + r + '">' + (c.link ? 'Reenviar link' : 'Enviar link') + '</button>');
+    if (CONFIG.demo && lnk && c.link) acc.push('<button type="button" class="btn-link" data-a="abrir-link" data-v="' + r + '">Abrir link (demo)</button>');
+    acc.push('<button type="button" class="btn btn-sec btn-chico" data-a="bloqueo" data-v="' + r + '">' + (c.habilitada ? 'Bloquear' : 'Habilitar') + '</button>');
+    return '<tr><td data-l="Empresa"><b>' + esc(s.remutyme[r].nombre) + '</b><div class="sub mono">' + rutBonito(r) + ' · ' + esc(s.remutyme[r].cartera) + '</div></td>' +
+      '<td data-l="Acceso"><span class="pill ' + e[1] + '">' + e[0] + '</span>' + (c.pideReset ? ' <span class="pill p-info">Pidió restablecer</span>' : '') +
+      (c.link && !c.hash ? '<div class="sub">Vence ' + esc(fmtHora(c.link.vence)) + '</div>' : '') + '</td>' +
+      '<td data-l="Correo de contacto">' + (c.correo ? esc(c.correo) : '<span class="sub">—</span>') + '</td><td data-l="Acciones"><div class="acciones" style="gap:6px">' + acc.join('') + '</div></td></tr>';
+  }).join('');
+  let res = '';
+  if (ui.carga && ui.carga.listo != null) res = '<div class="resultado" role="status"><b>' + plural(ui.carga.listo, 'empresa habilitada', 'empresas habilitadas') + '.</b>' + (lnk && ui.carga.listo ? '<span>A cada una le llegó su link para crear la clave (simulado).</span>' : '') + '</div>';
+  else if (ui.carga) {
+    const k = ui.carga;
+    res = '<div class="resultado" role="status"><b>Revisión de la lista</b>' +
+      (k.nuevas.length ? '<div>' + (k.nuevas.length === 1 ? 'Se habilitará 1 empresa' : 'Se habilitarán ' + k.nuevas.length + ' empresas') + ':<ul>' + k.nuevas.map(r => '<li>' + esc(s.remutyme[r].nombre) + ' <span class="mono">(' + rutBonito(r) + ')</span></li>').join('') + '</ul></div>' : '<div>No hay empresas nuevas para habilitar.</div>') +
+      (k.repetidos ? '<div class="sub">' + plural(k.repetidos, 'RUT repetido en la lista (se cuenta una vez)', 'RUT repetidos en la lista (se cuentan una vez)') + '.</div>' : '') +
+      (k.ya.length ? '<div class="sub">' + plural(k.ya.length, 'ya estaba habilitada', 'ya estaban habilitadas') + '.</div>' : '') +
+      (k.malos.length ? '<div class="malos">Con problemas (no se habilitan):<ul>' + k.malos.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
+      (k.nuevas.length ? '<button type="button" class="btn btn-pri" data-a="aplicar-carga">Habilitar ' + plural(k.nuevas.length, 'empresa', 'empresas') + '</button>' : '') +
+      '<button type="button" class="btn-link" data-a="cancelar-carga">Cancelar</button></div>';
+  }
+  const sinActivar = ruts.filter(r => !s.cuentas[r].hash && s.cuentas[r].habilitada).length, piden = ruts.filter(r => s.cuentas[r].pideReset).length;
+  return '<div class="fila-titulo"><h1 id="titulo" tabindex="-1" style="font-size:24px">Empresas habilitadas</h1><span class="sub">' + ruts.length + ' en la app · ' + sinActivar + ' sin activar' + (piden ? ' · ' + piden + ' piden restablecer' : '') + '</span></div>' +
+    '<p class="sub">Solo estos RUT pueden entrar. ' + (lnk ? 'Modo <b>link de un solo uso</b>: cada empresa recibe un link personal que vence en ' + CONFIG.horasLink + ' h para crear su clave. «Restablecer clave» manda un link nuevo.' : 'Modo <b>clave inicial</b>: la primera vez entran con la clave inicial y crean una propia. «Restablecer clave» la devuelve a la inicial.') + ' Nunca dictes ni mandes claves por correo o mensaje.</p>' +
+    '<div class="dos"><div class="ancho tabla-caja"><table class="tabla-resp"><caption class="sr">Cuentas de empresas en la app</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Acceso</th><th scope="col">Correo de contacto</th><th scope="col"><span class="sr">Acciones</span></th></tr></thead><tbody>' + filas + '</tbody></table></div>' +
+    '<div class="angosto"><form id="f-masiva" class="caja" novalidate><h2 style="font-size:17px">Habilitar empresas (masivo)</h2>' +
+    '<p class="sub">Un RUT por línea: pega la columna de RUT desde Excel o sube un CSV (se toma la primera columna con números). Solo se habilitan empresas que ya están en Remutyme. Antes de habilitar te mostramos qué va a pasar.</p>' +
+    '<div class="campo"><label for="masiva">RUT de las empresas</label><textarea id="masiva" rows="6" placeholder="99.000.500-1&#10;99.000.612-1"' + aria('masiva') + '>' + esc(val('masiva')) + '</textarea>' + pieCampo('masiva') + '</div>' +
+    '<div class="campo"><label for="masiva-archivo">O sube un archivo CSV</label><input id="masiva-archivo" type="file" accept=".csv,.txt,text/csv,text/plain"></div>' +
+    res + (ui.carga && ui.carga.listo == null ? '' : '<button type="submit" class="btn btn-pri">Revisar lista</button>') + '</form></div></div>';
+}
+function admActividad() {
+  const tipos = { todo: 'Todo', correo: 'Correos (simulados)', seguridad: 'Seguridad', accion: 'Acciones' };
+  const lista = s.actividad.filter(a => ui.actFiltro === 'todo' || a.tipo === ui.actFiltro).slice(-80).reverse();
+  const etiqueta = { correo: ['Correo simulado', 'p-info'], seguridad: ['Seguridad', 'p-crit'], accion: ['Acción', 'p-neutro'] };
+  return '<div class="fila-titulo"><h1 id="titulo" tabindex="-1" style="font-size:24px">Actividad</h1><span class="sub">Registro de lo que pasó en la app (en la real, quién lo hizo y desde dónde)</span></div>' +
+    '<div class="seg" role="group" aria-label="Filtrar actividad">' + Object.keys(tipos).map(k => '<button type="button" data-a="act-filtro" data-v="' + k + '" aria-pressed="' + (ui.actFiltro === k) + '">' + tipos[k] + '</button>').join('') + '</div>' +
+    '<div class="caja">' + (lista.length ? '<ul class="lista actividad" style="gap:0">' + lista.map(a => '<li><time datetime="' + esc(a.t) + '">' + esc(fmtHora(a.t)) + '</time><div style="display:flex;flex-direction:column;gap:4px;min-width:0"><span><span class="pill ' + etiqueta[a.tipo][1] + '">' + etiqueta[a.tipo][0] + '</span></span><span style="overflow-wrap:anywhere">' + esc(a.txt) + '</span></div></li>').join('') + '</ul>'
+      : '<div class="vacio"><strong>Todavía no hay actividad</strong><span class="sub">Entra como una empresa, envía novedades o habilita empresas y lo verás acá.</span></div>') + '</div>';
+}
+function admAjustes() {
+  const m = modo(), tema = leerLS(LS_TEMA) || 'auto';
+  return '<div class="fila-titulo"><h1 id="titulo" tabindex="-1" style="font-size:24px">Ajustes</h1></div>' +
+    '<section class="caja" aria-labelledby="t-act"><h2 id="t-act" style="font-size:18px">Cómo crea su clave cada empresa · <span class="pill p-warn">Pendiente de decisión</span></h2>' +
+    '<p class="sub">Las dos opciones están armadas. En la demo puedes cambiar entre ellas para probarlas; en la versión real queda fija la que se elija.</p>' +
+    '<div class="seg" role="group" aria-label="Forma de activación">' +
+    '<button type="button" data-a="activacion" data-v="clave-inicial" aria-pressed="' + (m === 'clave-inicial') + '">Clave inicial genérica</button>' +
+    '<button type="button" data-a="activacion" data-v="link" aria-pressed="' + (m === 'link') + '">Link de un solo uso</button></div>' +
+    '<div class="compara"><div class="nota nota-info"><strong>Clave inicial genérica</strong><ul>' +
+    '<li>Simple: no depende de que el correo de la empresa esté al día.</li>' +
+    '<li><b>Riesgo:</b> es la misma para todas y los RUT de empresas son públicos: quien sepa que una empresa es cliente y conozca la clave puede activar la cuenta antes que ella.</li>' +
+    '<li><b>Riesgo:</b> para entregarla hay que dictarla o escribirla, y la regla interna dice que las claves no se mandan por correo ni mensajes.</li></ul></div>' +
+    '<div class="nota nota-info"><strong>Link de un solo uso</strong><ul>' +
+    '<li>Personal por empresa: sirve una vez y vence en ' + CONFIG.horasLink + ' h. No hay ninguna clave que entregar.</li>' +
+    '<li>Llega al correo de RRHH que la empresa tiene en Remutyme; «Restablecer» manda otro.</li>' +
+    '<li><b>Requiere:</b> correos de RRHH al día en Remutyme y que el servidor envíe correos.</li></ul></div></div></section>' +
+    '<section class="caja" aria-labelledby="t-tema"><h2 id="t-tema" style="font-size:18px">Apariencia</h2><div class="seg" role="group" aria-label="Tema">' +
+    [['auto', 'Como el equipo'], ['light', 'Claro'], ['dark', 'Oscuro']].map(t => '<button type="button" data-a="tema" data-v="' + t[0] + '" aria-pressed="' + (tema === t[0]) + '">' + t[1] + '</button>').join('') + '</div></section>' +
+    (CONFIG.demo ? '<section class="caja" aria-labelledby="t-demo"><h2 id="t-demo" style="font-size:18px">Demo</h2><p class="sub">Vuelve todo a los datos ficticios de partida (borra lo que hayas probado en este navegador).</p><button type="button" class="btn btn-sec" data-a="reiniciar">Reiniciar la demo</button></section>' : '');
+}
+function vistaAdmin() {
+  const piden = srv.adm.empresas().filter(r => s.cuentas[r].pideReset).length;
+  const nav = (id, txt, b) => '<button type="button" data-a="adm" data-v="' + id + '"' + (ui.admTab === id ? ' aria-current="page"' : '') + '>' + txt + (b ? '<span class="badge" aria-label="' + plural(b, 'pide', 'piden') + ' restablecer clave">' + b + '</span>' : '') + '</button>';
+  const cuerpo = ui.admTab === 'empresas' ? admEmpresas() : ui.admTab === 'actividad' ? admActividad() : ui.admTab === 'ajustes' ? admAjustes() : admBandeja();
+  return '<header class="adm-top gutter"><div class="adm-top-in"><div class="adm-marca"><span>Contyme · Administración</span><span>' + esc(sesion.correo) + '</span></div>' +
+    '<nav class="adm-nav" aria-label="Administración">' + nav('bandeja', 'Bandeja') + nav('empresas', 'Empresas', piden) + nav('actividad', 'Actividad') + nav('ajustes', 'Ajustes') + '</nav>' +
+    '<button type="button" class="salir" data-a="salir">Salir</button></div></header>' +
+    '<main id="principal" class="adm-main gutter entra">' + cuerpo + '</main>';
+}
+
+/* ---------- Pintar ---------- */
+function validarSesion() {
+  if (!sesion) return;
+  if (sesion.rol === 'cliente') {
+    const c = s.cuentas[sesion.rut];
+    if (!c || !c.habilitada || !c.hash || c.intentos >= CONFIG.maxIntentos || !s.remutyme[sesion.rut]) cerrarSesion('Tu sesión se cerró porque cambió el acceso de la empresa.', true);
+  } else if (sesion.rol !== 'admin') cerrarSesion('', true);
+}
+function claveFoco(el) {
+  if (!el || el === document.body || !el.closest || !el.closest('#raiz')) return null;
+  if (el.id) return '#' + CSS.escape(el.id);
+  const a = el.getAttribute('data-a'); if (!a) return null;
+  const v = el.getAttribute('data-v'), q = x => x.replace(/["\\]/g, '\\$&');
+  return '[data-a="' + q(a) + '"]' + (v != null ? '[data-v="' + q(v) + '"]' : '');
+}
+function pintar() {
+  validarSesion();
+  const act = document.activeElement, sel = claveFoco(act);
+  let rango = null; try { if (act && act.selectionStart != null) rango = [act.selectionStart, act.selectionEnd]; } catch (e) {}
+  document.body.classList.toggle('es-admin', !!(sesion && sesion.rol === 'admin'));
+  $('raiz').innerHTML = !sesion ? vistaLogin() : sesion.rol === 'admin' ? vistaAdmin() : vistaCliente();
+  $('demo-barra').innerHTML = CONFIG.demo ? '<div class="demo-barra gutter" role="note"><span>DEMO · datos ficticios · el acceso y los correos son simulados</span><button type="button" data-a="que-simulado">¿Qué es simulado?</button></div>' : '';
+  let destino = null;
+  if (ui.foco) { destino = document.querySelector(ui.foco.charAt(0) === '[' ? ui.foco : '#' + ui.foco); ui.foco = null; }
+  else if (sel) { destino = document.querySelector(sel); if (destino === act) destino = null; }
+  if (destino) {
+    destino.focus({ preventScroll: false });
+    if (rango && destino.setSelectionRange && sel && destino === document.querySelector(sel)) { try { destino.setSelectionRange(rango[0], rango[1]); } catch (e) {} }
+  }
+}
+
+/* ---------- Diálogo y aviso ---------- */
+const dlg = $('dlg');
+let dlgAccion = null, dlgVuelta = null;
+function dialogo(o) {
+  dlgVuelta = document.activeElement; dlgAccion = o.accion || null;
+  dlg.innerHTML = '<div class="dlg-in"><h2 id="dlg-t">' + esc(o.titulo) + '</h2>' + (o.html || '') +
+    '<div class="dlg-pie">' + (o.cancelar === false ? '' : '<button type="button" class="btn btn-sec" data-dlg="no">' + esc(o.cancelar || 'Cancelar') + '</button>') +
+    (o.ok ? '<button type="button" class="btn ' + (o.peligro ? 'btn-peligro' : 'btn-pri') + '" data-dlg="si">' + esc(o.ok) + '</button>' : '') + '</div></div>';
+  try { dlg.showModal(); } catch (e) { dlg.setAttribute('open', ''); }
+  const primero = dlg.querySelector('textarea, input, [data-dlg="si"], [data-dlg="no"]'); if (primero) primero.focus();
+}
+function cerrarDialogo() {
+  try { dlg.close(); } catch (e) { dlg.removeAttribute('open'); }
+  dlgAccion = null;
+  if (dlgVuelta && document.body.contains(dlgVuelta)) dlgVuelta.focus();
+}
+dlg.addEventListener('click', ev => {
+  if (ev.target === dlg) { cerrarDialogo(); return; } // clic en el fondo
+  const b = ev.target.closest('[data-dlg]'); if (!b) return;
+  if (b.dataset.dlg === 'si' && dlgAccion) { const r = dlgAccion(dlg); if (r === false) return; }
+  cerrarDialogo();
+});
+dlg.addEventListener('close', () => { dlgAccion = null; });
+
+let tToast = null, deshacer = null;
+function toast(t, acc) {
+  const el = $('toast'); clearTimeout(tToast); deshacer = acc ? acc.fn : null;
+  el.innerHTML = '<span>' + esc(t) + '</span>' + (acc ? '<button type="button" data-toast="1">' + esc(acc.txt) + '</button>' : '');
+  tToast = setTimeout(() => { el.innerHTML = ''; deshacer = null; }, acc ? 6000 : 3000);
+}
+$('toast').addEventListener('click', ev => { if (ev.target.closest('[data-toast]') && deshacer) { const f = deshacer; deshacer = null; $('toast').innerHTML = ''; f(); } });
+
+/* ---------- Sesión ---------- */
+function entrar(nueva, saludo) {
+  sesion = Object.assign(nueva, { ultimo: Date.now() }); guardarSesion();
+  ui = uiInicial(); ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast(saludo);
+}
+function cerrarSesion(motivo, sinPintar) {
+  sesion = null; guardarSesion(); tickets.clear();
+  previas.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} }); previas.clear();
+  if (ui.archivo && ui.archivo.url) { try { URL.revokeObjectURL(ui.archivo.url); } catch (e) {} }
+  ui = uiInicial(); ui.aviso = motivo || ''; ui.foco = 'titulo';
+  if (!sinPintar) { pintar(); window.scrollTo(0, 0); }
+}
+function tocar() { if (sesion) { sesion.ultimo = Date.now(); guardarSesion(); } }
+setInterval(() => {
+  if (sesion && Date.now() - (sesion.ultimo || 0) > CONFIG.minutosInactividad * 60e3) {
+    cerrarSesion('Por seguridad cerramos la sesión tras ' + CONFIG.minutosInactividad + ' minutos sin uso. Vuelve a entrar para seguir; tu borrador quedó guardado.');
+  }
+}, 30e3);
+if (sesion && Date.now() - (sesion.ultimo || 0) > CONFIG.minutosInactividad * 60e3) cerrarSesion('Por seguridad cerramos la sesión por inactividad.', true);
+
+/* ---------- Navegación del cliente ---------- */
+function ir(tab, mantener) {
+  ui.tab = tab; ui.err = null;
+  if (!mantener) { ui.editando = null; ui.tipo = null; ui.form = {}; ui.archivo = null; }
+  ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0);
+}
+function abrirLinkDemo(token) {
+  const r = srv.abrirLink(token);
+  if (r.error) { ui.paso = 'rut'; ui.err = { msg: r.error }; ui.foco = 'titulo'; pintar(); return; }
+  ui.paso = 'crear'; ui.ticket = r.ticket; ui.crearPara = { rut: r.rut, nombre: r.nombre }; ui.form = {}; ui.err = null; ui.foco = 'nueva'; pintar();
+}
+function textoExcel(rut) {
+  const m = s.meses[rut], e = s.remutyme[rut];
+  /* Evita inyección de fórmulas al pegar en Excel (=, +, -, @ al inicio). */
+  const celda = v => { let t = String(v == null ? '' : v).replace(/[\t\r\n]+/g, ' ').trim(); if (/^[=+\-@]/.test(t)) t = "'" + t; return t; };
+  const filas = [['RUT empresa', 'Empresa', 'Trabajador', 'Tipo', 'Detalle', 'Comentario', 'Respaldo']].concat(
+    m.novedades.map(n => [rutBonito(rut), e.nombre, n.trabajador, n.tipo, detalle(n), n.comentario, n.adjunto ? n.adjunto.nombre : '']));
+  return filas.map(f => f.map(celda).join('\t')).join('\n');
+}
+function copiar(texto) {
+  const manual = () => dialogo({ titulo: 'Copia el texto', html: '<p class="sub">Tu navegador no dejó copiar solo. Selecciona todo y cópialo (Ctrl+C o mantener presionado).</p><div class="campo"><label for="dlg-copia">Datos para Excel</label><textarea id="dlg-copia" rows="8" readonly>' + esc(texto) + '</textarea></div>', cancelar: 'Cerrar' });
+  if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(texto).then(() => toast('Copiado: pégalo en Excel'), manual); else manual();
+}
+
+/* ---------- Acciones (clic) ---------- */
+const ACC = {
+  'que-simulado': () => dialogo({ titulo: 'Qué es simulado en esta demo', cancelar: 'Entendido', html: '<ul>' +
+    '<li><b>El acceso.</b> RUT, claves e intentos se revisan en este navegador. Cualquiera con el código puede saltárselo: no es seguridad real. En la versión real lo hace el servidor de Remutyme.</li>' +
+    '<li><b>Los datos.</b> Son ficticios y quedan solo en este navegador.</li>' +
+    '<li><b>Los correos.</b> No se manda ninguno; se anotan en Administración → Actividad.</li>' +
+    '<li><b>Google de Contyme.</b> El botón entra directo como administrador de prueba.</li>' +
+    '<li><b>Los archivos.</b> No salen de esta pestaña y se borran al cerrar sesión o recargar.</li></ul>' }),
+  paso: v => { ui.paso = v; ui.err = null; ui.aviso = ''; if (v === 'olvide') ui.form = { 'o-rut': val('rut') }; else if (v !== 'rut') ui.form = {}; ui.foco = 'titulo'; pintar(); },
+  'demo-fill': v => {
+    ui.form.rut = rutBonito(v); ui.err = null; ui.aviso = '';
+    ui.form.clave = v === '99000396-3' ? DEMO.semillas[v] : modo() === 'clave-inicial' ? DEMO.claveInicial : 'Prueba2026';
+    ui.foco = '[data-a="demo-fill"][data-v="' + v + '"]'; pintar(); toast('Listo: toca «Entrar»');
+  },
+  'demo-link': v => { const c = s.cuentas[v]; if (!c) return; if (c.hash) { toast('Esa empresa ya tiene clave. Restablécela desde Administración.'); return; } if (!c.link) { crearLink(v); guardar(); } abrirLinkDemo(c.link.token); },
+  'entrar-admin': () => { entrar({ rol: 'admin', correo: DEMO.admin }, 'Hola, administrador (simulado)'); registrar(null, 'seguridad', 'Ingreso de administrador (simulado): ' + DEMO.admin + '.'); guardar(); },
+  ver: (v, b) => { const i = $(v); if (!i) return; const mostrar = i.type === 'password'; i.type = mostrar ? 'text' : 'password'; b.textContent = mostrar ? 'Ocultar' : 'Mostrar'; b.setAttribute('aria-pressed', String(mostrar)); b.setAttribute('aria-label', mostrar ? 'Ocultar la clave' : 'Mostrar la clave'); },
+  salir: () => cerrarSesion('Cerraste la sesión.'),
+  tab: v => ir(v, v === ui.tab && v === 'nueva'),
+  nueva: () => ir('nueva'),
+  tipo: v => {
+    if (!TIPOS[v]) return;
+    ui.tipo = v; ui.err = null;
+    if (!TIPOS[v].adj) ui.archivo = null;
+    ui.foco = TIPOS[v].sinTrabajador ? 'c-' + TIPOS[v].campos[0].id : (val('trabajador') ? null : 'trabajador');
+    pintar();
+  },
+  editar: v => {
+    const id = Number(v), n = srv.cli.datos().mes.novedades.find(x => x.id === id); if (!n) return;
+    const d = srv.cli.datos();
+    ui.form = { comentario: n.comentario };
+    if (!TIPOS[n.tipo].sinTrabajador) { if (d.trabajadores.includes(n.trabajador)) ui.form.trabajador = n.trabajador; else { ui.form.trabajador = '__otro'; ui.form['trab-otro'] = n.trabajador; } }
+    TIPOS[n.tipo].campos.forEach(c => { let x = n.datos[c.id]; if (x == null) return; if (c.t === 'monto') x = Number(x).toLocaleString('es-CL'); else if (c.t === 'num') x = String(x).replace('.', ','); else if (c.t === 'rut') x = rutBonito(x); ui.form['c-' + c.id] = String(x); });
+    ui.tipo = n.tipo; ui.editando = id; ui.archivo = n.adjunto ? Object.assign({}, n.adjunto, { url: previas.get(id) || null }) : null;
+    ir('nueva', true);
+  },
+  quitar: v => {
+    const r = srv.cli.quitar(Number(v)); if (!r) return;
+    pintar(); ui.foco = null;
+    const sig = document.querySelector('[data-a="nueva"]'); if (sig) sig.focus();
+    toast('Quitaste la novedad de ' + r.n.trabajador, { txt: 'Deshacer', fn: () => { srv.cli.restaurar(r.n, r.i); pintar(); toast('Novedad recuperada'); } });
+  },
+  'quitar-archivo': () => { ui.archivo = null; ui.foco = 'archivo'; pintar(); },
+  'sin-nov': v => { srv.cli.sinNovedades(v === 'si'); ui.foco = '[data-a="enviar"]'; pintar(); toast(v === 'si' ? 'Marcado: sin novedades. Falta enviar.' : 'Listo, agrega tus novedades'); },
+  enviar: () => {
+    const d = srv.cli.datos(), m = d.mes, n = m.novedades.length;
+    const faltan = m.novedades.filter(x => TIPOS[x.tipo] && TIPOS[x.tipo].importante && !x.adjunto);
+    const ejemplos = m.novedades.filter(x => x.ejemplo).length;
+    dialogo({
+      titulo: n ? '¿Enviar ' + plural(n, 'novedad', 'novedades') + ' a Contyme?' : '¿Avisar que no hubo novedades?',
+      html: (n ? '<ul>' + m.novedades.map(x => '<li><b>' + esc(x.trabajador) + '</b>: ' + esc(x.tipo.toLowerCase()) + ' · ' + esc(detalle(x)) + '</li>').join('') + '</ul>' : '<p>Contyme hará las liquidaciones de ' + esc(CONFIG.periodo.mes) + ' igual que el mes pasado.</p>') +
+        (faltan.length ? '<div class="nota nota-warn">' + plural(faltan.length, 'novedad no tiene', 'novedades no tienen') + ' respaldo (' + esc(faltan.map(x => x.trabajador).join(', ')) + '). Puedes enviar igual; Contyme te lo pedirá.</div>' : '') +
+        (ejemplos ? '<div class="nota nota-info">Hay ' + plural(ejemplos, 'novedad de ejemplo', 'novedades de ejemplo') + ' de la demo. Quítalas si no corresponden.</div>' : '') +
+        '<p class="sub">Después de enviar ya no puedes cambiarlas. Si te falta algo, tu encargada puede reabrir el envío.</p>',
+      ok: 'Sí, enviar', cancelar: 'Revisar de nuevo',
+      accion: () => { const r = srv.cli.enviar(); if (r.error) { toast(r.error); return; } ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Enviado a Contyme'); }
+    });
+  },
+  pdf: v => toast('Demo: en la app real aquí se descarga el PDF de ' + v + '.'),
+  adm: v => { ui.admTab = v; ui.err = null; ui.carga = null; ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); },
+  filtro: v => { ui.filtro = v; pintar(); },
+  'limpiar-filtro': () => { ui.filtro = 'todas'; ui.buscar = ''; ui.foco = 'buscar'; pintar(); },
+  sel: v => { ui.sel = v; ui.foco = 'det-titulo'; pintar(); },
+  recordar: v => { srv.adm.recordar(v); pintar(); toast('Recordatorio enviado a ' + s.remutyme[v].nombre + ' (simulado)'); },
+  'recordar-todas': () => {
+    const p = srv.adm.empresas().filter(r => estadoAdm(r)[0] === 'No ha enviado' && s.cuentas[r].habilitada);
+    dialogo({ titulo: '¿Recordar a ' + plural(p.length, 'empresa', 'empresas') + '?', html: '<ul>' + p.map(r => '<li>' + esc(s.remutyme[r].nombre) + (s.recordados[r] ? ' <span class="sub">(ya recordada ' + esc(fmtHora(s.recordados[r])) + ')</span>' : '') + '</li>').join('') + '</ul><p class="sub">Les llega un correo corto pidiendo que envíen sus novedades antes del ' + esc(fmtCorta(CONFIG.periodo.plazo)) + '.</p>',
+      ok: 'Enviar recordatorios', accion: () => { p.forEach(r => srv.adm.recordar(r)); pintar(); toast(plural(p.length, 'recordatorio enviado', 'recordatorios enviados') + ' (simulado)'); } });
+  },
+  marcar: v => { srv.adm.marcar(ui.sel, v); ui.foco = 'det-titulo'; pintar(); toast(v === 'revisada' ? 'Marcada revisada' : v === 'ingresada' ? 'Marcada ingresada' : 'Vuelve a «Por revisar»'); },
+  copiar: () => copiar(textoExcel(ui.sel)),
+  reabrir: () => {
+    const nom = s.remutyme[ui.sel].nombre, rut = ui.sel;
+    dialogo({ titulo: 'Pedir corrección a ' + nom, ok: 'Reabrir y avisar',
+      html: '<p class="sub">El envío vuelve a borrador para que la empresa corrija y envíe de nuevo. Le llega un aviso con tu mensaje.</p><div class="campo"><label for="dlg-nota">¿Qué tiene que revisar?</label><textarea id="dlg-nota" rows="3" maxlength="300" placeholder="Ej. falta la foto de la licencia de María"></textarea><span class="err-campo" id="dlg-err" hidden></span></div>',
+      accion: d => { const t = d.querySelector('#dlg-nota').value.trim(); if (t.length < 5) { const e = d.querySelector('#dlg-err'); e.textContent = 'Escribe qué tiene que revisar (así el cliente sabe qué hacer).'; e.hidden = false; d.querySelector('#dlg-nota').setAttribute('aria-invalid', 'true'); d.querySelector('#dlg-nota').focus(); return false; }
+        srv.adm.reabrir(rut, t); ui.foco = 'det-titulo'; pintar(); toast('Envío reabierto; aviso enviado (simulado)'); } });
+  },
+  restablecer: v => {
+    const nom = s.remutyme[v].nombre;
+    dialogo({ titulo: '¿Restablecer la clave de ' + nom + '?', ok: 'Restablecer', peligro: true,
+      html: '<p>' + (modo() === 'link' ? 'Su clave deja de servir y le llega un link nuevo para crear otra.' : 'Su clave deja de servir y vuelve a entrar con la clave inicial.') + '</p><p class="sub">Hazlo solo si la empresa lo pidió. No dictes ni mandes claves por correo o mensaje.</p>',
+      accion: () => { srv.adm.restablecer(v); pintar(); toast('Clave restablecida'); } });
+  },
+  'enviar-link': v => { srv.adm.enviarLink(v); pintar(); toast('Link enviado a RRHH de ' + s.remutyme[v].nombre + ' (simulado)'); },
+  'abrir-link': v => { const c = s.cuentas[v]; if (!c || !c.link) return; const tk = c.link.token; cerrarSesion('', true); abrirLinkDemo(tk); toast('Abriste el link como lo vería la empresa'); },
+  bloqueo: v => {
+    const c = s.cuentas[v], nom = s.remutyme[v].nombre;
+    if (!c.habilitada) { srv.adm.alternarBloqueo(v); pintar(); toast(nom + ': acceso habilitado'); return; }
+    dialogo({ titulo: '¿Bloquear el acceso de ' + nom + '?', ok: 'Bloquear', peligro: true, html: '<p>No podrá entrar a la app hasta que la vuelvas a habilitar. Sus datos se mantienen.</p>',
+      accion: () => { srv.adm.alternarBloqueo(v); pintar(); toast(nom + ': acceso bloqueado'); } });
+  },
+  'aplicar-carga': () => { const n = srv.adm.aplicarCarga(ui.carga.nuevas); ui.carga = { listo: n }; ui.form.masiva = ''; pintar(); toast(plural(n, 'empresa habilitada', 'empresas habilitadas')); },
+  'cancelar-carga': () => { ui.carga = null; ui.foco = 'masiva'; pintar(); },
+  'act-filtro': v => { ui.actFiltro = v; pintar(); },
+  activacion: v => { srv.adm.cambiarActivacion(v); pintar(); toast('Modo de la demo: ' + (v === 'link' ? 'link de un solo uso' : 'clave inicial')); },
+  tema: v => { escribirLS(LS_TEMA, v); aplicarTema(); pintar(); },
+  reiniciar: () => dialogo({ titulo: '¿Reiniciar la demo?', ok: 'Reiniciar', peligro: true, html: '<p>Se borra todo lo que probaste en este navegador y vuelven los datos ficticios de partida.</p>',
+    accion: () => { s = semilla(); listo = prepararSemillas(); previas.clear(); tickets.clear(); const tab = ui.admTab; ui = uiInicial(); ui.admTab = tab; guardar(); pintar(); toast('Demo reiniciada'); } })
+};
+document.addEventListener('click', ev => {
+  const b = ev.target.closest('#raiz [data-a], #demo-barra [data-a]'); if (!b) return;
+  const f = ACC[b.dataset.a]; if (!f) return;
+  tocar();
+  try { f(b.dataset.v, b); } catch (e) { toast('Algo falló. Recarga la página e intenta de nuevo.'); if (window.console) console.warn(e); }
+});
+
+/* ---------- Escritura en formularios ---------- */
+document.addEventListener('input', ev => {
+  const t = ev.target; if (!t.id || t.type === 'file' || !t.closest('#raiz')) return;
+  ui.form[t.id] = t.value;
+  if (ui.err && ui.err.campo === t.id) { t.removeAttribute('aria-invalid'); const e = $(t.id + '-err'); if (e) e.remove(); ui.err = null; }
+  if (t.id === 'comentario' && $('contador')) $('contador').textContent = t.value.length + '/500';
+  if (t.id === 'buscar') { ui.buscar = t.value; pintar(); }
+  if (t.id === 'trabajador') { ui.foco = t.value === '__otro' ? 'trab-otro' : null; pintar(); }
+});
+document.addEventListener('focusout', ev => {
+  const t = ev.target; if (!t.id || !t.closest || !t.closest('#raiz')) return;
+  if ((t.id === 'rut' || t.id === 'o-rut' || t.dataset.rut) && t.value) { const r = normRut(t.value); if (r && dvValido(r)) { t.value = rutBonito(r); ui.form[t.id] = t.value; } }
+  if (t.dataset.monto && t.value) { const n = Number(t.value.replace(/\D/g, '')); if (n) { t.value = n.toLocaleString('es-CL'); ui.form[t.id] = t.value; } }
+});
+['keydown', 'keyup'].forEach(tipo => document.addEventListener(tipo, ev => {
+  if (ev.target && ev.target.id === 'clave' && ev.getModifierState) { const c = $('caps'); if (c) c.hidden = !ev.getModifierState('CapsLock'); }
+  if (tipo === 'keydown') tocar();
+}));
+
+document.addEventListener('change', ev => {
+  const t = ev.target;
+  if (t.id === 'archivo') {
+    const f = t.files && t.files[0]; if (!f) return;
+    const okTipo = /^image\//.test(f.type) || f.type === 'application/pdf' || /\.(pdf|jpe?g|png|heic|heif|webp)$/i.test(f.name);
+    if (!okTipo) { ui.err = { campo: 'archivo', msg: 'Ese archivo no sirve. Sube una foto (JPG, PNG, HEIC) o un PDF.' }; ui.foco = 'archivo'; pintar(); return; }
+    if (f.size > CONFIG.maxArchivoMB * 1048576) { ui.err = { campo: 'archivo', msg: 'El archivo pesa ' + fmtNum(f.size / 1048576) + ' MB; el máximo es ' + CONFIG.maxArchivoMB + ' MB. Prueba con una foto más liviana.' }; ui.foco = 'archivo'; pintar(); return; }
+    if (!f.size) { ui.err = { campo: 'archivo', msg: 'El archivo está vacío. Vuelve a sacar la foto.' }; ui.foco = 'archivo'; pintar(); return; }
+    const mime = f.type || (/\.pdf$/i.test(f.name) ? 'application/pdf' : 'image/*');
+    ui.archivo = { nombre: f.name.slice(0, 80), kb: Math.max(1, Math.round(f.size / 1024)), mime, url: /^image\//.test(mime) ? URL.createObjectURL(f) : null };
+    ui.err = null; ui.foco = '[data-a="quitar-archivo"]'; pintar(); return;
+  }
+  if (t.id === 'masiva-archivo') {
+    const a = t.files && t.files[0]; if (!a) return;
+    if (a.size > 1048576) { ui.err = { campo: 'masiva', msg: 'El archivo es muy grande para una lista de RUT (máximo 1 MB).' }; pintar(); return; }
+    const lector = new FileReader();
+    lector.onload = () => { ui.form.masiva = String(lector.result).replace(/^\uFEFF/, '').trim(); ui.carga = null; ui.err = null; ui.foco = 'masiva'; pintar(); toast('Archivo leído: toca «Revisar lista»'); };
+    lector.onerror = () => toast('No se pudo leer el archivo.');
+    lector.readAsText(a);
+  }
+});
+
+/* ---------- Envío de formularios ---------- */
+function falla(campo, msg) { ui.err = { campo: campo || null, msg }; ui.foco = campo === 'tipo' ? '[data-a="tipo"]' : campo || null; pintar(); if (!campo) { const e = document.querySelector('#raiz .error'); if (e) e.scrollIntoView({ block: 'center' }); } return false; }
+function leerCampos(tipo) {
+  const def = TIPOS[tipo], datos = {};
+  for (const c of def.campos) {
+    const id = 'c-' + c.id, v = String(val(id)).trim();
+    if (!v) return { campo: id, msg: c.t === 'fecha' ? 'Elige la fecha «' + c.l.toLowerCase() + '».' : c.t === 'opc' ? 'Elige el ' + c.l.toLowerCase() + '.' : 'Falta «' + c.l.toLowerCase() + '».' };
+    if (c.t === 'num') {
+      const x = Number(v.replace(',', '.'));
+      if (!isFinite(x) || x < c.min || x > c.max) return { campo: id, msg: 'Escribe un número entre ' + fmtNum(c.min) + ' y ' + fmtNum(c.max) + '.' };
+      if (Math.round(x * 2) !== x * 2) return { campo: id, msg: 'Usa números enteros o medios, por ejemplo 2,5.' };
+      datos[c.id] = x;
+    } else if (c.t === 'monto') {
+      if (/[.,]\d{1,2}$/.test(v) && !/\.\d{3}$/.test(v)) return { campo: id, msg: 'Escribe el monto en pesos, sin decimales.' };
+      const x = Number(v.replace(/\D/g, ''));
+      if (!x) return { campo: id, msg: 'Escribe el monto en pesos, por ejemplo 50.000.' };
+      if (x > 50000000) return { campo: id, msg: 'El monto parece muy alto. Revísalo.' };
+      datos[c.id] = x;
+    } else if (c.t === 'fecha') {
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(v) || isNaN(dLocal(v))) return { campo: id, msg: 'Elige una fecha válida.' };
+      datos[c.id] = v;
+    } else if (c.t === 'rut') {
+      const r = normRut(v); if (!r || !dvValido(r)) return { campo: id, msg: 'Revisa el RUT: falta un número o el dígito verificador no calza.' };
+      datos[c.id] = r;
+    } else if (c.t === 'opc') {
+      if (c.ops.indexOf(v) < 0) return { campo: id, msg: 'Elige una opción de la lista.' };
+      datos[c.id] = v;
+    } else {
+      if (v.length < 2) return { campo: id, msg: 'Escribe un poco más.' };
+      datos[c.id] = v.slice(0, 200);
+    }
+  }
+  if (datos.desde && datos.hasta) {
+    if (datos.hasta < datos.desde) return { campo: 'c-hasta', msg: '«Hasta» no puede ser antes de «Desde».' };
+    if (diasEntre(datos.desde, datos.hasta) > 366) return { campo: 'c-hasta', msg: 'El período es de más de un año. Revisa las fechas.' };
+  }
+  return { datos };
+}
+const SUB = {
+  'f-ingreso': async () => {
+    if (ui.cargando) return;
+    const rutTxt = val('rut'), clave = val('clave');
+    ui.cargando = true; ui.err = null; ui.aviso = ''; pintar();
+    let r; try { r = await srv.ingresar(rutTxt, clave); } catch (e) { r = { error: 'No pudimos revisar la clave. Intenta de nuevo.' }; }
+    ui.cargando = false;
+    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.paso === 'crear') { ui.paso = 'crear'; ui.ticket = r.ticket; ui.crearPara = { rut: r.rut, nombre: r.nombre }; ui.form = {}; ui.foco = 'nueva'; pintar(); return; }
+    ui.form.clave = ''; falla(r.campo, r.error);
+  },
+  'f-crear': async () => {
+    if (ui.cargando) return;
+    ui.cargando = true; ui.err = null; pintar();
+    let r; try { r = await srv.crearClave(ui.ticket, val('nueva'), val('repite'), val('contacto')); } catch (e) { r = { error: 'No pudimos guardar la clave. Intenta de nuevo.' }; }
+    ui.cargando = false;
+    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.reiniciar) { ui.paso = 'rut'; ui.form = {}; }
+    if (r.campo === 'nueva' || r.campo === 'repite') { ui.form.repite = ''; }
+    falla(r.campo, r.error);
+  },
+  'f-olvide': () => {
+    const r = srv.pedirRestablecer(val('o-rut'));
+    if (r.error) return falla(r.campo, r.error);
+    ui.err = null; ui.aviso = 'Listo. Si ese RUT está habilitado, tu encargada recibió el aviso y te contactará. Contyme nunca te pedirá tu clave.'; pintar();
+  },
+  'f-nov': () => {
+    if (!ui.tipo) return falla('tipo', 'Elige qué pasó.');
+    const def = TIPOS[ui.tipo], d = srv.cli.datos();
+    let trabajador = null;
+    if (!def.sinTrabajador) {
+      const t = val('trabajador');
+      if (!t) return falla('trabajador', 'Elige el trabajador.');
+      if (t === '__otro') { trabajador = String(val('trab-otro')).trim().replace(/\s+/g, ' '); if (trabajador.length < 3) return falla('trab-otro', 'Escribe el nombre y apellido del trabajador.'); }
+      else if (d.trabajadores.indexOf(t) < 0) return falla('trabajador', 'Elige un trabajador de la lista.');
+      else trabajador = t;
+    }
+    const r = leerCampos(ui.tipo); if (r.campo) return falla(r.campo, r.msg);
+    if (def.sinTrabajador) trabajador = r.datos.nombre;
+    const a = def.adj && ui.archivo ? { nombre: ui.archivo.nombre, kb: ui.archivo.kb, mime: ui.archivo.mime } : null;
+    const repetida = d.mes.novedades.some(x => x.id !== ui.editando && x.trabajador === trabajador && x.tipo === ui.tipo);
+    const res = srv.cli.guardarNovedad({ trabajador, tipo: ui.tipo, datos: r.datos, comentario: String(val('comentario')).trim(), adjunto: a }, ui.editando);
+    if (res.error) return falla(null, res.error);
+    if (a && ui.archivo.url) previas.set(res.id, ui.archivo.url); else if (!a) previas.delete(res.id);
+    const editado = ui.editando != null;
+    ir('mes');
+    toast(repetida ? 'Guardada. Ojo: ' + trabajador + ' ya tenía otra novedad de ese tipo; revisa que no esté repetida.' : editado ? 'Cambios guardados' : 'Novedad guardada. Falta enviar a Contyme.');
+  },
+  'f-masiva': () => {
+    const texto = val('masiva');
+    if (!texto.trim()) return falla('masiva', 'Pega al menos un RUT o sube un CSV.');
+    if (texto.split(/\r?\n/).length > 2000) return falla('masiva', 'Son demasiadas líneas. Sube hasta 2.000 empresas por vez.');
+    ui.carga = srv.adm.analizarCarga(texto); ui.err = null; ui.foco = null; pintar();
+    const btn = document.querySelector('[data-a="aplicar-carga"]') || document.querySelector('[data-a="cancelar-carga"]'); if (btn) btn.focus();
+  }
+};
+document.addEventListener('submit', ev => {
+  ev.preventDefault();
+  const f = SUB[ev.target.id]; if (!f) return;
+  tocar();
+  Promise.resolve().then(f).catch(e => { ui.cargando = false; toast('Algo falló. Recarga la página e intenta de nuevo.'); if (window.console) console.warn(e); });
+});
+
+/* ---------- Tema ---------- */
+function aplicarTema() { const t = leerLS(LS_TEMA); if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme'); }
+
+/* ---------- Arranque ---------- */
+aplicarTema();
+listo = (window.crypto && crypto.subtle ? prepararSemillas() : Promise.resolve()).catch(() => {});
+pintar();
+})();
+</script>
+
+<script>
+/* PWA: el service worker guarda la app para abrirla sin internet. */
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
+}
+</script>
+</body>
+</html>
