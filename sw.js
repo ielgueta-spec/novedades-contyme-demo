@@ -3,7 +3,7 @@
  * - Página: primero la red, sin caché del navegador (para tomar siempre la versión nueva); sin red, la guardada.
  * - Cada mejora: subir VERSION aquí y VERSION_APP en index.html (mismo número). Los teléfonos instalados la detectan
  *   al abrir la app o al volver a ella, y se recargan solos cuando la persona no está a mitad de algo. */
-const VERSION = 'novedades-v13';
+const VERSION = 'novedades-v14';
 const APP = [
   './',
   'index.html',
@@ -43,8 +43,13 @@ self.addEventListener('fetch', (e) => {
   if (req.mode === 'navigate') {
     e.respondWith(
       fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
-        .then((r) => { if (r.ok) { const copia = r.clone(); caches.open(VERSION).then((c) => c.put('index.html', copia)); } return r; })
-        .catch(() => caches.match('index.html')),
+        .then((r) => {
+          // Solo la app (./ o index.html) se guarda para abrir sin internet; otras páginas (ayuda.html) no la pisan.
+          const esApp = /\/(index\.html)?$/.test(url.pathname);
+          if (r.ok && esApp) { const copia = r.clone(); caches.open(VERSION).then((c) => c.put('index.html', copia)); }
+          return r;
+        })
+        .catch(() => caches.match(req).then((g) => g || caches.match('index.html'))),
     );
     return;
   }

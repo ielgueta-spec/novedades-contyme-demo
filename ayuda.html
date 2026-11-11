@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="es-CL">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cómo usar Novedades Remuneraciones</title>
+<meta name="description" content="Paso a paso para ingresar, instalar y enviar las novedades de tus trabajadores a Contyme.">
+<meta name="theme-color" content="#0F4C47">
+<link rel="icon" type="image/png" sizes="32x32" href="iconos/favicon-32.png">
+<link rel="stylesheet" href="fuentes/fuentes.css">
+<style>
+:root {
+  --bg: #F3F6F5; --card: #FFFFFF; --fg: #13201F; --muted: #52625F; --line: #D9E2E0;
+  --brand: #0F4C47; --brand-soft: #E3F1EE; --brand-ink: #0B5A54; --acento: #149687; --aviso: #FFF6E0; --aviso-borde: #E7B94A;
+  --display: "Outfit", "Segoe UI", system-ui, sans-serif; --texto: "Source Sans 3", "Segoe UI", system-ui, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) { --bg: #0E1615; --card: #16211F; --fg: #E6EFED; --muted: #9DB0AC; --line: #2A3A37; --brand-soft: #173A36; --brand-ink: #8FD6CB; --aviso: #2E2714; --aviso-borde: #8A6A1E; }
+}
+:root[data-theme="dark"] { --bg: #0E1615; --card: #16211F; --fg: #E6EFED; --muted: #9DB0AC; --line: #2A3A37; --brand-soft: #173A36; --brand-ink: #8FD6CB; --aviso: #2E2714; --aviso-borde: #8A6A1E; }
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: var(--texto); font-size: 17px; line-height: 1.55; }
+img { max-width: 100%; }
+a { color: var(--brand-ink); }
+.envoltura { max-width: 860px; margin: 0 auto; padding: 0 16px; }
+header.portada { background: var(--brand); color: #fff; padding: 28px 0 32px; }
+header.portada img.logo { width: 180px; height: auto; display: block; margin-bottom: 18px; }
+header.portada h1 { font-family: var(--display); font-size: clamp(26px, 6vw, 38px); line-height: 1.15; margin: 0 0 10px; }
+header.portada p { margin: 0; color: #CDEAE5; max-width: 600px; }
+.abrir { display: flex; flex-wrap: wrap; gap: 20px; align-items: center; margin-top: 22px; }
+.btn { display: inline-block; background: #fff; color: var(--brand); font-weight: 700; text-decoration: none; padding: 13px 22px; border-radius: 10px; font-size: 17px; }
+.qr { display: flex; gap: 12px; align-items: center; color: #CDEAE5; font-size: 14px; }
+.qr img { width: 92px; height: 92px; border-radius: 8px; background: #fff; padding: 4px; }
+.indice { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 6px; padding: 0; list-style: none; }
+.indice a { display: inline-block; padding: 7px 13px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); text-decoration: none; font-size: 15px; color: var(--fg); }
+section { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 22px 20px; margin: 18px 0; }
+h2 { font-family: var(--display); font-size: 24px; margin: 0 0 6px; display: flex; gap: 12px; align-items: center; }
+h2 .n { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--brand); color: #fff; display: inline-grid; place-items: center; font-size: 18px; }
+h3 { font-family: var(--display); font-size: 19px; margin: 18px 0 6px; }
+.sub { color: var(--muted); margin: 0 0 12px; }
+ol.pasos { margin: 8px 0 0; padding-left: 22px; }
+ol.pasos li { margin: 6px 0; }
+.dos { display: grid; grid-template-columns: 1fr; gap: 18px; align-items: start; }
+@media (min-width: 700px) { .dos { grid-template-columns: 1.2fr 1fr; } }
+.tel { width: 100%; max-width: 280px; border-radius: 22px; border: 6px solid #1B2A28; box-shadow: 0 6px 20px rgba(0,0,0,.12); display: block; margin: 0 auto; }
+.galeria { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px; margin-top: 12px; }
+.galeria figure { margin: 0; }
+.galeria figcaption { font-size: 14px; color: var(--muted); text-align: center; margin-top: 8px; }
+.aviso { background: var(--aviso); border-left: 4px solid var(--aviso-borde); padding: 12px 14px; border-radius: 8px; margin: 14px 0 0; font-size: 16px; }
+.info { background: var(--brand-soft); border-left: 4px solid var(--acento); padding: 12px 14px; border-radius: 8px; margin: 14px 0 0; font-size: 16px; }
+.equipos { display: grid; grid-template-columns: 1fr; gap: 14px; margin-top: 10px; }
+@media (min-width: 760px) { .equipos { grid-template-columns: repeat(3, 1fr); } }
+.equipo { border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; background: var(--bg); }
+.equipo h3 { margin-top: 0; display: flex; align-items: center; gap: 8px; }
+.ico { display: inline-block; vertical-align: -4px; width: 20px; height: 20px; }
+kbd, .tecla { display: inline-block; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--card); border-radius: 6px; padding: 0 6px; font-size: 15px; font-family: var(--texto); white-space: nowrap; }
+details { border-top: 1px solid var(--line); padding: 12px 0; }
+details:first-of-type { border-top: 0; }
+summary { cursor: pointer; font-weight: 700; }
+details p { margin: 8px 0 0; }
+footer { text-align: center; color: var(--muted); font-size: 14px; padding: 18px 0 36px; }
+@media print { header.portada { -webkit-print-color-adjust: exact; print-color-adjust: exact; } section { break-inside: avoid; } .indice { display: none; } }
+</style>
+</head>
+<body>
+<header class="portada">
+  <div class="envoltura">
+    <img class="logo" src="iconos/logo-contyme-blanco-520.png" alt="Contyme · Asesores, Auditores, Contables" width="180" height="51">
+    <h1>Cómo usar Novedades Remuneraciones</h1>
+    <p>Cada mes nos cuentas aquí lo que pasó con tus trabajadores (horas extra, bonos, licencias, vacaciones, ingresos, términos) y con eso hacemos sus liquidaciones de sueldo. Toma un par de minutos.</p>
+    <div class="abrir">
+      <a class="btn" href="./">Abrir la app</a>
+      <div class="qr"><img src="ayuda/qr-app.png" alt="Código QR para abrir la app en el teléfono" width="92" height="92"><span>¿Estás en el computador?<br>Escanéalo con la cámara<br>del teléfono.</span></div>
+    </div>
+  </div>
+</header>
+
+<main class="envoltura">
+  <ul class="indice" aria-label="Contenido">
+    <li><a href="#entrar">1 · Entrar la primera vez</a></li>
+    <li><a href="#instalar">2 · Instalar en el teléfono</a></li>
+    <li><a href="#enviar">3 · Enviar las novedades</a></li>
+    <li><a href="#dudas">Dudas frecuentes</a></li>
+  </ul>
+
+  <section id="entrar">
+    <h2><span class="n">1</span>Entrar la primera vez</h2>
+    <p class="sub">Necesitas el RUT de tu empresa y la <b>clave inicial</b> que te entregó tu encargada de remuneraciones en Contyme.</p>
+    <div class="dos">
+      <div>
+        <ol class="pasos">
+          <li>Abre <a href="./">la app</a> (o escanea el código QR de arriba).</li>
+          <li>Escribe el <b>RUT de la empresa</b>, con o sin puntos y con el guion (ej. 76.123.456-7).</li>
+          <li>Escribe la <b>clave inicial</b> y toca <b>Entrar</b>.</li>
+          <li>La app te pide <b>crear tu propia clave</b>: mínimo 8 caracteres, con letras y números. Escríbela dos veces.</li>
+          <li>Agrega un <b>correo de contacto</b>: ahí te llega la confirmación cada vez que envías.</li>
+          <li>Toca <b>Guardar y entrar</b>. Desde ahora entras con el RUT y tu clave.</li>
+        </ol>
+        <div class="info"><b>Recuérdame en este dispositivo:</b> si la marcas, no tendrás que volver a entrar por 30 días. No la marques en un computador compartido.</div>
+        <div class="aviso"><b>Por seguridad, Contyme nunca manda claves por correo ni por mensaje</b>, y nunca te va a pedir tu clave. Guárdala tú.</div>
+      </div>
+      <div class="galeria" style="margin-top:0">
+        <figure><img class="tel" src="ayuda/1-ingreso.jpg" alt="Pantalla de ingreso con RUT de la empresa, clave y la casilla Recuérdame" width="390" height="760" loading="lazy"><figcaption>Ingreso con RUT y clave</figcaption></figure>
+        <figure><img class="tel" src="ayuda/2-crear-clave.jpg" alt="Pantalla para crear tu clave y escribir el correo de contacto" width="390" height="760" loading="lazy"><figcaption>La primera vez creas tu clave</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <section id="instalar">
+    <h2><span class="n">2</span>Instalar en el teléfono</h2>
+    <p class="sub">Así queda como una app más, con el ícono de Contyme, y se abre con un toque. No ocupa espacio y <b>se actualiza sola</b>. No está en la App Store ni en Google Play: se instala desde el navegador.</p>
+    <div class="equipos">
+      <div class="equipo">
+        <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M16.4 12.6c0-2.4 2-3.6 2.1-3.7-1.1-1.7-2.9-1.9-3.5-1.9-1.5-.2-2.9.9-3.7.9-.8 0-1.9-.9-3.2-.8-1.6 0-3.1 1-4 2.4-1.7 3-.4 7.4 1.2 9.8.8 1.2 1.8 2.5 3 2.4 1.2 0 1.7-.8 3.2-.8s1.9.8 3.2.8 2.1-1.2 2.9-2.4c.9-1.4 1.3-2.7 1.3-2.8-.1 0-2.5-1-2.5-3.9zM14 5.5c.7-.8 1.1-1.9 1-3-1 0-2.1.7-2.8 1.5-.6.7-1.2 1.8-1 2.9 1.1.1 2.1-.6 2.8-1.4z"/></svg>iPhone</h3>
+        <ol class="pasos">
+          <li>Abre la app en <b>Safari</b> (el navegador azul de la brújula).</li>
+          <li>Toca el botón <b>Compartir</b> <svg class="ico" viewBox="0 0 24 24" aria-label="(cuadrado con flecha hacia arriba)"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" d="M12 3v12M8 7l4-4 4 4M6 11H5a1 1 0 0 0-1 1v8a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-8a1 1 0 0 0-1-1h-1"/></svg> abajo al centro.</li>
+          <li>Baja y toca <b>Agregar a pantalla de inicio</b>.</li>
+          <li>Toca <b>Agregar</b> arriba a la derecha.</li>
+        </ol>
+        <p class="sub" style="margin-top:8px;font-size:15px">Si no ves la opción, revisa que estés en Safari y no dentro de WhatsApp o Gmail: toca «Abrir en Safari».</p>
+      </div>
+      <div class="equipo">
+        <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M17.5 9.2l1.7-3a.4.4 0 0 0-.7-.4l-1.8 3A10.5 10.5 0 0 0 12 8a10.5 10.5 0 0 0-4.7.8l-1.8-3a.4.4 0 0 0-.7.4l1.7 3A9.9 9.9 0 0 0 1.5 17h21a9.9 9.9 0 0 0-5-7.8zM7 14.2a1 1 0 1 1 0-2 1 1 0 0 1 0 2zm10 0a1 1 0 1 1 0-2 1 1 0 0 1 0 2z"/></svg>Android</h3>
+        <ol class="pasos">
+          <li>Abre la app en <b>Chrome</b>.</li>
+          <li>Abajo en la pantalla de ingreso toca <b>Instalar la app</b>. Si no aparece, toca el menú <span class="tecla">⋮</span> arriba a la derecha.</li>
+          <li>Elige <b>Instalar aplicación</b> (o «Agregar a pantalla principal»).</li>
+          <li>Confirma con <b>Instalar</b>.</li>
+        </ol>
+      </div>
+      <div class="equipo">
+        <h3><svg class="ico" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round" d="M3 5h18v11H3zM9 20h6M12 16v4"/></svg>Computador</h3>
+        <ol class="pasos">
+          <li>Abre la app en <b>Chrome</b> o <b>Edge</b>.</li>
+          <li>En la barra de direcciones, a la derecha, toca el ícono <b>Instalar</b> (una pantalla con una flecha).</li>
+          <li>Confirma con <b>Instalar</b>. Queda en el escritorio y en el menú Inicio.</li>
+        </ol>
+        <p class="sub" style="margin-top:8px;font-size:15px">También puedes usarla sin instalar, guardando el link en favoritos.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="enviar">
+    <h2><span class="n">3</span>Enviar las novedades del mes</h2>
+    <p class="sub">Puedes hacerlo de a poco: lo que agregas queda guardado como borrador hasta que lo envías.</p>
+    <ol class="pasos">
+      <li>Toca <b>Nueva</b> (abajo) y elige <b>qué pasó</b>: horas extra, bono, licencia médica, vacaciones, ausencia, anticipo, ingreso, término u otro.</li>
+      <li>Elige al <b>trabajador</b>, completa los datos y, si tienes, agrega la <b>foto del respaldo</b> (por ejemplo, la licencia médica). Toca <b>Guardar</b>.</li>
+      <li>Repite por cada cosa que pasó. En <b>Este mes</b> ves la lista y puedes editar o quitar.</li>
+      <li>Cuando esté todo, toca <b>Enviar a Contyme</b> y confirma. Te llega un correo con el resumen y tu encargada recibe el aviso.</li>
+      <li>En <b>Este mes</b> ves <b>en qué va</b>: enviadas → revisadas por Contyme → ingresadas → liquidaciones listas.</li>
+    </ol>
+    <div class="info"><b>¿Pasó algo más después de enviar?</b> Toca <b>Agregar más novedades</b> y envía lo nuevo. <b>¿No hubo novedades?</b> Toca <b>No tuve novedades este mes</b> y confirma: hacemos las liquidaciones igual que el mes anterior.</div>
+    <div class="galeria">
+      <figure><img class="tel" src="ayuda/4-nueva.jpg" alt="Pantalla Nueva novedad con los tipos: horas extra, bono, licencia médica y otros" width="390" height="760" loading="lazy"><figcaption>Eliges qué pasó</figcaption></figure>
+      <figure><img class="tel" src="ayuda/5-borrador.jpg" alt="Pantalla Este mes con una novedad en borrador y el botón Enviar a Contyme" width="390" height="760" loading="lazy"><figcaption>Revisas y envías</figcaption></figure>
+      <figure><img class="tel" src="ayuda/6-enviadas.jpg" alt="Pantalla con el envío confirmado y los pasos de En qué va" width="390" height="760" loading="lazy"><figcaption>Sigues en qué va</figcaption></figure>
+    </div>
+  </section>
+
+  <section id="dudas">
+    <h2>Dudas frecuentes</h2>
+    <details><summary>Olvidé mi clave</summary><p>En la pantalla de ingreso toca <b>Olvidé mi clave</b> y escribe el RUT de la empresa. Tu encargada recibe el aviso, la restablece y te avisa; después entras con la clave inicial y creas una nueva.</p></details>
+    <details><summary>Me equivoqué en algo que ya envié</summary><p>Escríbele a tu encargada (o responde el correo de confirmación). Ella reabre tu envío para que lo corrijas y lo vuelvas a enviar.</p></details>
+    <details><summary>¿Hasta cuándo puedo enviar?</summary><p>El plazo del mes aparece arriba en la app («Plazo: …»). Mientras más temprano, mejor: así revisamos todo con tiempo.</p></details>
+    <details><summary>¿Tengo que actualizar la app?</summary><p>No. Se actualiza sola cada vez que la abres con internet. Abajo en la pantalla de ingreso ves el número de versión.</p></details>
+    <details><summary>¿Quién ve la información?</summary><p>Solo tu empresa y el equipo de remuneraciones de Contyme. Los respaldos (como las licencias médicas) quedan en una carpeta privada de Contyme, compartida solo con tu encargada.</p></details>
+    <details><summary>¿Necesito ayuda?</summary><p>Escríbele a tu encargada de remuneraciones en Contyme: con gusto te acompañamos la primera vez.</p></details>
+  </section>
+</main>
+<footer>CONTYME · Asesores · Auditores · Contables</footer>
+</body>
+</html>

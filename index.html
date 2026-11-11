@@ -257,7 +257,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 13; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 14; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -529,6 +529,9 @@ function crearLink(rut) {
   registrar(rut, 'correo', 'Correo a RRHH de ' + e.nombre + ' (' + e.correoRrhh + '): link de un solo uso para crear la clave; vence en ' + CONFIG.horasLink + ' h.');
   return c.link;
 }
+function instalada() { return (window.matchMedia && matchMedia('(display-mode: standalone)').matches) || navigator.standalone === true; }
+function esIOS() { return /iPhone|iPad|iPod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+function esMovil() { return esIOS() || /Android|Mobi/i.test(navigator.userAgent); }
 function soyCliente() { if (!sesion || sesion.rol !== 'cliente') throw new Error('Se requiere sesión de cliente'); return sesion.rut; }
 function soyAdmin() { if (!sesion || sesion.rol !== 'admin') throw new Error('Se requiere sesión de administrador'); }
 
@@ -779,6 +782,7 @@ const val = id => ui.form[id] == null ? '' : ui.form[id];
 
 /* ---------- Componentes ---------- */
 const ICO = {
+  descargar: '<svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="vertical-align:-3px"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" d="M12 4v11M7 10l5 5 5-5M5 20h14"/></svg>',
   x: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M18 6 6 18M6 6l12 12"/></svg>',
   lapiz: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>',
   check: '<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5"/></svg>',
@@ -867,7 +871,10 @@ function vistaLogin() {
   }
   return '<div class="login"><header class="login-top gutter"><img class="logo-login" src="iconos/logo-contyme-blanco-520.png" alt="Contyme · Asesores, Auditores, Contables" width="190" height="54"><h1>Novedades Remuneraciones</h1><p>Envía a Contyme lo que pasó con tus trabajadores este mes para hacer las liquidaciones.</p></header>' +
     '<main id="principal">' + cuerpo + '</main>' +
-    (ui.paso === 'rut' ? '<p class="pie-login"><button type="button" class="btn-link chico" data-a="paso" data-v="contyme">Acceso equipo Contyme</button></p>' : '') +
+    (ui.paso === 'rut' ? '<div class="pie-login" style="display:flex;flex-direction:column;align-items:center;gap:10px">' +
+      (instalada() ? '' : '<button type="button" class="btn btn-sec" data-a="instalar" style="width:auto;padding-inline:20px">' + ICO.descargar + ' Instalar la app en este ' + (esMovil() ? 'teléfono' : 'equipo') + '</button>') +
+      '<a class="btn-link chico" href="ayuda.html">¿Cómo se usa? Paso a paso</a>' +
+      '<button type="button" class="btn-link chico" data-a="paso" data-v="contyme">Acceso equipo Contyme</button></div>' : '') +
     '<p class="sub centro" style="font-size:12px;opacity:.7;margin:4px 0 16px">Versión ' + VERSION_APP + '</p></div>';
 }
 
@@ -1249,6 +1256,18 @@ function copiar(texto) {
 
 /* ---------- Acciones (clic) ---------- */
 const ACC = {
+  instalar: async () => {
+    if (avisoInstalar) { const a = avisoInstalar; avisoInstalar = null; a.prompt(); try { await a.userChoice; } catch (e) {} pintar(); return; }
+    const ios = esIOS(), enApp = /FBAN|FBAV|Instagram|WhatsApp|GSA\//i.test(navigator.userAgent);
+    const pasos = ios
+      ? (/CriOS|FxiOS|EdgiOS/i.test(navigator.userAgent) || enApp ? '<li>Abre este link en <b>Safari</b> (copia el link y pégalo en Safari).</li>' : '') +
+        '<li>Toca el botón <b>Compartir</b> (el cuadrado con una flecha hacia arriba), abajo al centro.</li><li>Baja y toca <b>Agregar a pantalla de inicio</b>.</li><li>Toca <b>Agregar</b>, arriba a la derecha.</li>'
+      : esMovil()
+        ? '<li>Abre este link en <b>Chrome</b>.</li><li>Toca el menú <b>⋮</b>, arriba a la derecha.</li><li>Elige <b>Instalar aplicación</b> o <b>Agregar a pantalla principal</b>.</li>'
+        : '<li>Abre este link en <b>Chrome</b> o <b>Edge</b>.</li><li>En la barra de direcciones, a la derecha, toca el ícono <b>Instalar</b>.</li><li>Confirma con <b>Instalar</b>.</li>';
+    dialogo({ titulo: 'Instalar en ' + (ios ? 'tu iPhone' : esMovil() ? 'tu teléfono' : 'este equipo'), cancelar: 'Entendido',
+      html: '<ol style="padding-left:20px;margin:0 0 10px">' + pasos + '</ol><p class="sub">Queda con el ícono de Contyme y se actualiza sola. <a href="ayuda.html#instalar">Ver el paso a paso con fotos</a></p>' });
+  },
   'agregar-mas': () => { srv.cli.agregarMas(); ui.tab = 'mes'; ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Agrega lo nuevo y envíalo'); },
   'cancelar-agregar': () => { srv.cli.cancelarAgregar(); ui.foco = 'titulo'; pintar(); toast('Quedó como estaba'); },
   'que-simulado': () => dialogo({ titulo: CONFIG.demo ? 'Qué es simulado en esta demo' : 'Sobre esta versión piloto', cancelar: 'Entendido', html: '<ul>' +
@@ -1562,6 +1581,11 @@ if (REMOTO && sesion && sesion.token) {
   (sesion.rol === 'admin' ? cargarAdmin() : api('cli-datos').then(r => { if (r.ok) cargarCliente(r.datos); })).then(() => { if (sesion) pintar(); });
 }
 
+/* ---------- Instalar la app ----------
+ * Android/Chrome/Edge: usa el aviso propio del navegador. iPhone: no existe ese aviso, se muestran los pasos. */
+let avisoInstalar = null;
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); avisoInstalar = e; });
+window.addEventListener('appinstalled', () => { avisoInstalar = null; toast('¡Listo! La app quedó instalada'); pintar(); });
 /* ---------- Actualización automática (PWA) ----------
  * Al abrir la app o volver a ella se busca una versión nueva. Si llega, la app se recarga sola, salvo que la persona
  * esté escribiendo, enviando o con un diálogo abierto: en ese caso espera a que termine. El borrador nunca se pierde. */
