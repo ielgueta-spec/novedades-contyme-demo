@@ -9,6 +9,7 @@
  * Nada sensible va escrito en este archivo (es público en GitHub). Va en «Propiedades del script»:
  *   ADMINS          correos con acceso de administrador, separados por coma
  *   CLAVE_INICIAL   clave genérica con que las empresas entran la primera vez
+ *   PLAZO_DIA       (opcional) día del mes en que vence el envío de novedades; si no está, 25
  *   (SHEET_ID y CARPETA_ID los completa instalar())
  */
 
@@ -25,7 +26,8 @@ var HOJAS = {
   Trabajadores: ['rut', 'nombre', 'rutTrabajador', 'baja'],   // baja = último período en que aparece (término)
   Envios: ['id', 'periodo', 'rut', 'empresa', 'fecha', 'cantidad', 'sinNovedades', 'estado', 'nota', 'carpeta'],
   Novedades: ['envioId', 'periodo', 'rut', 'trabajador', 'tipo', 'detalle', 'comentario', 'respaldo', 'respaldoUrl', 'datos', 'rutTrabajador'],
-  Actividad: ['fecha', 'rut', 'tipo', 'texto']
+  Actividad: ['fecha', 'rut', 'tipo', 'texto'],
+  Mensajes: ['fecha', 'periodo', 'rut', 'de', 'autor', 'texto']   // conversación cliente ↔ Contyme por mes
 };
 
 /* ---------- Instalación ---------- */
@@ -84,7 +86,21 @@ function doGet(e) {
 var _mem = {};
 function prop(k) { if (!_mem.p) _mem.p = PropertiesService.getScriptProperties().getProperties(); return _mem.p[k] || ''; }
 function libro() { return _mem.libro || (_mem.libro = SpreadsheetApp.openById(prop('SHEET_ID'))); }
-function hoja(n) { _mem.h = _mem.h || {}; return _mem.h[n] || (_mem.h[n] = libro().getSheetByName(n)); }
+function hoja(n) {
+  _mem.h = _mem.h || {}; if (_mem.h[n]) return _mem.h[n];
+  var h = libro().getSheetByName(n);
+  if (!h && HOJAS[n]) { h = libro().insertSheet(n); h.getRange(1, 1, 1, HOJAS[n].length).setValues([HOJAS[n]]).setFontWeight('bold'); h.setFrozenRows(1); }
+  return (_mem.h[n] = h);
+}
+/* Período = mes en curso; plazo = PLAZO_DIA (25 si no está) de ese mes. */
+function dos(n) { return ('0' + n).slice(-2); }
+function periodoActual() { var d = new Date(); return d.getFullYear() + '-' + dos(d.getMonth() + 1); }
+function diaPlazo() { var n = Math.round(Number(prop('PLAZO_DIA'))); return n >= 1 && n <= 28 ? n : 25; }
+function plazoDe(periodo) { return periodo + '-' + dos(diaPlazo()); }
+function mensajesDe(rut, periodo) {
+  return filas('Mensajes').filter(function (x) { return x.rut === rut && x.periodo === periodo; })
+    .map(function (x) { return { t: x.fecha, de: x.de, autor: x.de === 'contyme' ? 'Contyme' : '', texto: String(x.texto) }; });
+}
 function valores(n) {
   _mem.v = _mem.v || {};
   if (!_mem.v[n]) precargar([n]);
@@ -309,7 +325,7 @@ function mesDe(rut, periodo, conUrls) {
     return { enviado: null, revisado: false, ingresado: false, nota: e.nota || null, novedades: nov, sinNovedades: siNo(e.sinNovedades), reabierto: true };
   }
   if (!conUrls) nov.forEach(function (n) { if (n.adjunto) delete n.adjunto.url; });
-  return { enviado: e.fecha, revisado: e.estado === 'revisada' || e.estado === 'ingresada', ingresado: e.estado === 'ingresada',
+  return { enviado: e.fecha, revisado: ['revisada', 'ingresada', 'listas'].indexOf(e.estado) >= 0, ingresado: e.estado === 'ingresada' || e.estado === 'listas', listas: e.estado === 'listas',
     nota: null, novedades: nov, sinNovedades: siNo(e.sinNovedades), carpeta: conUrls ? e.carpeta : undefined };
 }
 function trabajadorVigente(x, periodo) { return !(x.baja && periodo && periodo > String(x.baja)); }
@@ -320,9 +336,9 @@ function trabajadoresDe(rut, periodo) {
 }
 function rutsTrabajadores(rut) { var m = {}; filas('Trabajadores').forEach(function (x) { if (x.rut === rut && x.rutTrabajador) m[x.nombre] = x.rutTrabajador; }); return m; }
 function datosCliente(rut, periodo) {
-  precargar(['Empresas', 'Trabajadores', 'Envios', 'Novedades']);
+  precargar(['Empresas', 'Trabajadores', 'Envios', 'Novedades', 'Mensajes']);
   var e = empresa(rut);
-  return { rut: rut, nombre: e.nombre, contacto: e.contacto, trabajadores: trabajadoresDe(rut, periodo), mes: periodoOk(periodo) ? mesDe(rut, periodo, false) : null };
+  return { rut: rut, nombre: e.nombre, contacto: e.contacto, plazo: periodoOk(periodo) ? plazoDe(periodo) : '', mensajes: periodoOk(periodo) ? mensajesDe(rut, periodo) : [], trabajadores: trabajadoresDe(rut, periodo), mes: periodoOk(periodo) ? mesDe(rut, periodo, false) : null };
 }
 function claveDebil(clave, rut) {
   var k = clave.toLowerCase(), ini = prop('CLAVE_INICIAL').toLowerCase();
@@ -533,7 +549,7 @@ var ACCIONES = {
   'adm-datos': function (q) {
     var s = sesionDe(q, 'admin'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
     var per = periodoOk(q.periodo) ? q.periodo : '';
-    precargar(['Empresas', 'Trabajadores', 'Envios', 'Novedades', 'Actividad']);
+    precargar(['Empresas', 'Trabajadores', 'Envios', 'Novedades', 'Actividad', 'Mensajes']);
     var trab = filas('Trabajadores'), envios = filas('Envios').filter(function (x) { return x.periodo === per; });
     var empresas = filas('Empresas').map(function (e) {
       return { rut: e.rut, nombre: e.nombre, correoEncargada: e.correoEncargada, habilitada: siNo(e.habilitada), registrada: !!e.hash,
@@ -542,8 +558,9 @@ var ACCIONES = {
     });
     var meses = {};
     envios.forEach(function (x) { meses[x.rut] = mesDe(x.rut, per, true); if (x.estado === 'reabierto') meses[x.rut].nota = x.nota; });
+    var msgs = {}; if (per) filas('Mensajes').forEach(function (x) { if (x.periodo === per) (msgs[x.rut] = msgs[x.rut] || []).push({ t: x.fecha, de: x.de, autor: x.autor, texto: String(x.texto) }); });
     var act = filas('Actividad').slice(-200).map(function (a) { return { t: a.fecha, rut: a.rut || null, tipo: a.tipo, txt: a.texto }; });
-    return { ok: true, empresas: empresas, meses: meses, actividad: act };
+    return { ok: true, empresas: empresas, meses: meses, actividad: act, mensajes: msgs, plazo: per ? plazoDe(per) : '' };
   },
 
   'adm-habilitar': function (q) {
@@ -586,13 +603,42 @@ var ACCIONES = {
     return { ok: true, nuevos: nuevos, actualizados: actualizados, malos: malos };
   },
 
+  /* Mensajes del mes: el cliente escribe a Contyme y Contyme responde. Cada mensaje avisa al otro lado por correo. */
+  'cli-mensaje': function (q) {
+    var s = sesionDe(q, 'cliente'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
+    var txt = String(q.texto || '').trim().slice(0, 1000); if (txt.length < 2) return { campo: 'msg-cli', error: 'Escribe tu mensaje.' };
+    var per = periodoOk(q.periodo) ? q.periodo : periodoActual(), e = empresa(s.rut); if (!e) return { error: 'Empresa no encontrada.', salir: true };
+    conCandado(function () { agregar('Mensajes', { fecha: ahora(), periodo: per, rut: s.rut, de: 'cliente', autor: e.contacto || '', texto: txt }); });
+    var para = deContyme(e.correoEncargada) ? e.correoEncargada : admins().join(',');
+    correo(para, 'Mensaje de ' + e.nombre + ' (novedades ' + nombreMes(per) + ')', { titulo: e.nombre + ' te escribió', filas: [['Empresa', e.nombre], ['RUT', rutPuntos(s.rut)], ['Período', nombreMes(per)]],
+      nota: txt, boton: { txt: 'Responder en la app', url: APP_URL } });
+    registrar(s.rut, 'correo', e.nombre + ' escribió un mensaje; aviso a ' + para + '.');
+    return { ok: true, mensajes: mensajesDe(s.rut, per) };
+  },
+  'adm-mensaje': function (q) {
+    var s = sesionDe(q, 'admin'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
+    var txt = String(q.texto || '').trim().slice(0, 1000); if (txt.length < 2) return { campo: 'msg-adm', error: 'Escribe la respuesta.' };
+    var e = empresa(normRut(q.rut)); if (!e || !periodoOk(q.periodo)) return { error: 'Empresa no encontrada.' };
+    conCandado(function () { agregar('Mensajes', { fecha: ahora(), periodo: q.periodo, rut: e.rut, de: 'contyme', autor: s.correo, texto: txt }); });
+    var ok = correo(e.contacto, 'Tienes una respuesta de Contyme · ' + e.nombre, { titulo: 'Tienes una respuesta de Contyme', intro: 'Sobre tus novedades de ' + nombreMes(q.periodo) + ':',
+      nota: txt, boton: { txt: 'Ver y responder en la app', url: APP_URL }, responderA: deContyme(e.correoEncargada) ? e.correoEncargada : '' });
+    registrar(e.rut, 'correo', 'Respuesta de ' + s.correo + ' a ' + e.nombre + (ok ? '' : ' (sin correo de contacto: solo en la app)') + '.');
+    return { ok: true };
+  },
+
   'adm-bloqueo': function (q) { return conEmpresaAdm(q, function (e, s) { e.habilitada = !!q.habilitada; registrar(e.rut, 'seguridad', e.nombre + ': acceso ' + (e.habilitada ? 'habilitado' : 'bloqueado') + ' por ' + s.correo + '.'); }); },
   'adm-restablecer': function (q) { return conEmpresaAdm(q, function (e, s) { e.hash = ''; e.sal = ''; e.intentos = 0; e.pideReset = false; registrar(e.rut, 'seguridad', e.nombre + ': clave restablecida por ' + s.correo + '.'); }); },
 
   'adm-marcar': function (q) {
     return conEnvioAdm(q, function (x, e, s) {
-      x.estado = q.estado === 'ingresada' ? 'ingresada' : q.estado === 'revisada' ? 'revisada' : 'enviado';
+      x.estado = q.estado === 'listas' ? 'listas' : q.estado === 'ingresada' ? 'ingresada' : q.estado === 'revisada' ? 'revisada' : 'enviado';
       registrar(e.rut, 'accion', e.nombre + ': marcada «' + x.estado + '» por ' + s.correo + '.');
+      if (x.estado === 'listas') {
+        agregar('Mensajes', { fecha: ahora(), periodo: x.periodo, rut: e.rut, de: 'contyme', autor: s.correo, texto: 'Tus liquidaciones de ' + nombreMes(x.periodo) + ' están listas.' });
+        correo(e.contacto, 'Tus liquidaciones de ' + nombreMes(x.periodo) + ' están listas · ' + e.nombre, {
+          titulo: '¡Tus liquidaciones están listas!', intro: 'Terminamos las liquidaciones de ' + nombreMes(x.periodo) + ' de ' + e.nombre + '. Tu encargada te las hace llegar por la vía de siempre.',
+          boton: { txt: 'Ver en qué va', url: APP_URL }, responderA: deContyme(e.correoEncargada) ? e.correoEncargada : '' });
+      }
     });
   },
   'adm-reabrir': function (q) {
@@ -634,4 +680,45 @@ function conEnvioAdm(q, fn) {
     if (!x) return { error: 'Esa empresa no tiene envío en el período.' };
     fn(x, e, s); escribir('Envios', x); return { ok: true };
   });
+}
+
+/* ---------- Recordatorios automáticos de plazo ----------
+ * activarRecordatorios() se corre UNA vez desde el editor (pide permiso para activadores). Después, cada día a las 9:
+ * - 3 días antes, 1 día antes y el día del plazo: correo a cada empresa habilitada que no ha enviado el mes;
+ * - 1 día antes: resumen a cada encargada (o a los administradores) con las empresas que faltan. */
+function activarRecordatorios() {
+  ScriptApp.getProjectTriggers().forEach(function (tr) { if (tr.getHandlerFunction() === 'recordatoriosDiarios') ScriptApp.deleteTrigger(tr); });
+  ScriptApp.newTrigger('recordatoriosDiarios').timeBased().everyDays(1).atHour(9).create();
+  Logger.log('Recordatorios activados: todos los días a las 9. Plazo: día ' + diaPlazo() + ' de cada mes.');
+}
+function recordatoriosDiarios() {
+  _mem = {};
+  var per = periodoActual(), plazo = plazoDe(per), hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+  var p = plazo.split('-'), fin = new Date(Number(p[0]), Number(p[1]) - 1, Number(p[2])), dias = Math.round((fin - hoy) / 86400000);
+  if ([3, 1, 0].indexOf(dias) < 0) return;
+  precargar(['Empresas', 'Envios']);
+  var faltan = filas('Empresas').filter(function (e) { if (!siNo(e.habilitada)) return false; var x = envioDe(e.rut, per); return !x || x.estado === 'reabierto'; });
+  var cuando = dias === 0 ? 'hoy' : dias === 1 ? 'mañana' : 'en ' + dias + ' días', fecha = p[2] + '-' + p[1] + '-' + p[0];
+  faltan.forEach(function (e) {
+    var k = 'rec:' + per + ':' + dias + ':' + e.rut; if (cache().get(k)) return;
+    var ok = correo(e.contacto, (dias === 0 ? 'Hoy vence' : 'Vence ' + cuando) + ' el plazo de novedades de ' + nombreMes(per) + ' · ' + e.nombre, {
+      titulo: dias === 0 ? 'Hoy vence el plazo' : 'Quedan ' + (dias === 1 ? '1 día' : dias + ' días'),
+      intro: 'Todavía no recibimos las novedades de ' + nombreMes(per) + ' de ' + e.nombre + '. El plazo vence ' + cuando + ' (' + fecha + ').',
+      nota: 'Si no hubo cambios, basta con tocar «No tuve novedades este mes» y enviar.',
+      boton: { txt: 'Enviar mis novedades', url: APP_URL }, responderA: deContyme(e.correoEncargada) ? e.correoEncargada : '' });
+    cache().put(k, '1', 93600);
+    registrar(e.rut, 'correo', 'Recordatorio automático (plazo ' + cuando + ')' + (ok ? '' : ': sin correo de contacto, no se envió') + '.');
+  });
+  if (dias === 1 && faltan.length) {
+    var porEnc = {};
+    faltan.forEach(function (e) { var k = deContyme(e.correoEncargada) ? e.correoEncargada : admins().join(','); (porEnc[k] = porEnc[k] || []).push(e); });
+    Object.keys(porEnc).forEach(function (para) {
+      var kr = 'recres:' + per + ':' + para; if (cache().get(kr)) return; cache().put(kr, '1', 93600);
+      correo(para, 'Mañana vence el plazo: ' + porEnc[para].length + ' empresa' + (porEnc[para].length === 1 ? '' : 's') + ' sin enviar novedades', {
+        titulo: 'Empresas que aún no envían ' + nombreMes(per),
+        intro: 'El plazo vence mañana (' + fecha + '). A cada una ya le llegó un recordatorio automático.',
+        tabla: porEnc[para].map(function (e) { return { trabajador: e.nombre, tipo: rutPuntos(e.rut), detalle: e.contacto ? 'Recordatorio enviado' : 'Sin correo de contacto: avisar por otra vía' }; }),
+        boton: { txt: 'Abrir la bandeja', url: APP_URL } });
+    });
+  }
 }

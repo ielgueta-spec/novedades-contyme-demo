@@ -28,6 +28,13 @@ Cuando un cliente toca «Enviar a Contyme», el servidor:
 Si en el paso 5 no aparece «Cualquier usuario», el administrador de Google Workspace de Contyme tiene que permitir
 apps web públicas.
 
+## Recordatorios automáticos de plazo (una vez)
+
+1. En el editor elige la función **`activarRecordatorios`** → **Ejecutar** → acepta el permiso nuevo (activadores).
+2. Desde ahí, todos los días a las 9 la app revisa el plazo: 3 días antes, el día anterior y el mismo día manda un
+   recordatorio a cada empresa que no ha enviado, y el día anterior un resumen a cada encargada.
+3. El plazo es el día **25** de cada mes. Para cambiarlo, agrega la propiedad **`PLAZO_DIA`** (por ejemplo `20`).
+
 ## Cuando cambie `Code.gs`
 
 Pega el código nuevo → **Implementar** → **Gestionar implementaciones** → lápiz → Versión: **Nueva versión** →
