@@ -18,6 +18,7 @@ var MAX_INTENTOS = 5;
 var ITERACIONES = 2000;                   // vueltas del hash de las claves
 var HORAS_SESION_CLIENTE = 2;
 var HORAS_SESION_ADMIN = 8;
+var DIAS_RECORDAR = 30;                 // «Recuérdame en este dispositivo»
 var MAX_ARCHIVO_MB = 8;
 var HOJAS = {
   Empresas: ['rut', 'nombre', 'correoEncargada', 'habilitada', 'hash', 'sal', 'intentos', 'contacto', 'pideReset', 'actualizada'],
@@ -173,11 +174,32 @@ function periodoOk(p) { return /^\d{4}-\d{2}$/.test(String(p || '')); }
 function nombreMes(p) { var m = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre']; return m[Number(p.slice(5, 7)) - 1] + ' ' + p.slice(0, 4); }
 function admins() { return prop('ADMINS').split(',').map(function (x) { return x.trim().toLowerCase(); }).filter(Boolean); }
 function cache() { return CacheService.getScriptCache(); }
+/* Sesión firmada: s1|rol|rut o correo|huella corta de la clave|vence|firma. La firma usa TOKEN_SECRETO (se crea solo).
+ * Si la empresa cambia o restablece su clave, o un correo deja de ser administrador, la sesión deja de servir. */
+function secreto() {
+  var k = prop('TOKEN_SECRETO');
+  if (!k) { k = azar() + azar(); PropertiesService.getScriptProperties().setProperty('TOKEN_SECRETO', k); if (_mem.p) _mem.p.TOKEN_SECRETO = k; }
+  return k;
+}
+function firmar(t) { return hex(Utilities.computeHmacSha256Signature(t, secreto())); }
 function sesionDe(q, rol) {
-  var v = q.token && cache().get('t:' + q.token); if (!v) return null;
+  var tk = String(q.token || '');
+  if (tk.indexOf('s1|') === 0) {
+    var p = tk.split('|'); if (p.length !== 6) return null;
+    if (p[1] !== rol || !(Number(p[4]) > Date.now()) || firmar(p.slice(0, 5).join('|')) !== p[5]) return null;
+    if (rol === 'cliente') { var e = empresa(p[2]); return e && e.hash && String(e.hash).slice(0, 12) === p[3] ? { rol: rol, rut: p[2] } : null; }
+    return admins().indexOf(p[2]) >= 0 ? { rol: rol, correo: p[2] } : null;
+  }
+  var v = tk && cache().get('t:' + tk); if (!v) return null; // sesiones antiguas (antes de la firma)
   var s = JSON.parse(v); return s.rol === rol ? s : null;
 }
-function nuevaSesion(datos, horas) { var t = azar(); cache().put('t:' + t, JSON.stringify(datos), horas * 3600); return t; }
+function nuevaSesion(datos, horas, recordar) {
+  var vence = Date.now() + (recordar ? DIAS_RECORDAR * 24 : horas) * 3600000;
+  var quien = datos.rol === 'cliente' ? datos.rut : datos.correo;
+  var huellaCorta = datos.rol === 'cliente' ? String((empresa(datos.rut) || {}).hash || '').slice(0, 12) : '';
+  var t = ['s1', datos.rol, quien, huellaCorta, vence].join('|');
+  return t + '|' + firmar(t);
+}
 function registrar(rut, tipo, texto) { agregar('Actividad', { fecha: ahora(), rut: rut || '', tipo: tipo, texto: String(texto).slice(0, 500) }); }
 /**
  * Manda un correo con versión HTML (diseño Contyme) y versión de texto.
@@ -324,7 +346,7 @@ var ACCIONES = {
       if (e.hash && String(e.sal).indexOf('v2:') !== 0 && esPre(q.pre)) { e.sal = 'v2:' + azar(); e.hash = huellaV2(q.pre, e.sal); cambiar = true; }
       if (cambiar) { e.intentos = 0; escribir('Empresas', e); }
       if (!e.hash) { var t = azar(); cache().put('k:' + t, rut, 600); return { paso: 'crear', ticket: t, nombre: e.nombre, rut: rut }; }
-      return { ok: true, rut: rut, token: nuevaSesion({ rol: 'cliente', rut: rut }, HORAS_SESION_CLIENTE), datos: datosCliente(rut, q.periodo) };
+      return { ok: true, rut: rut, token: nuevaSesion({ rol: 'cliente', rut: rut }, HORAS_SESION_CLIENTE, !!q.recordar), datos: datosCliente(rut, q.periodo) };
     });
   },
 
@@ -340,7 +362,7 @@ var ACCIONES = {
       e.contacto = contacto; e.intentos = 0; e.pideReset = false; e.actualizada = ahora();
       escribir('Empresas', e); cache().remove('k:' + q.ticket);
       registrar(rut, 'seguridad', e.nombre + ' creó su clave.');
-      return { ok: true, rut: rut, token: nuevaSesion({ rol: 'cliente', rut: rut }, HORAS_SESION_CLIENTE), datos: datosCliente(rut, q.periodo) };
+      return { ok: true, rut: rut, token: nuevaSesion({ rol: 'cliente', rut: rut }, HORAS_SESION_CLIENTE, !!q.recordar), datos: datosCliente(rut, q.periodo) };
     });
   },
 
@@ -382,7 +404,7 @@ var ACCIONES = {
     // Revisión rápida antes de subir nada (se repite con candado más abajo).
     precargar(['Empresas', 'Envios']);
     var e = empresa(s.rut); if (!e || !siNo(e.habilitada)) return bloqueada;
-    var antes = envioDe(s.rut, q.periodo); if (antes && antes.estado !== 'reabierto') return yaEnviaste;
+    var antes = envioDe(s.rut, q.periodo); if (antes && antes.estado !== 'reabierto' && !q.agregar) return yaEnviaste;
     // 1) Respaldos a Drive FUERA del candado: es lo más lento y así no frena el ingreso ni los envíos de otras empresas.
     //    Si no hay respaldos no se toca Drive (antes se creaba y compartía la carpeta igual: segundos perdidos).
     var car = null, urls = {}, subidos = [];
@@ -400,7 +422,8 @@ var ACCIONES = {
       precargar(['Empresas', 'Envios', 'Trabajadores']);
       e = empresa(s.rut); if (!e || !siNo(e.habilitada)) return bloqueada;
       var previo = envioDe(s.rut, q.periodo);
-      if (previo && previo.estado !== 'reabierto') return yaEnviaste;
+      if (previo && previo.estado !== 'reabierto' && !q.agregar) return yaEnviaste;
+      var agrego = !!(previo && q.agregar && previo.estado !== 'reabierto');
       var id = previo ? previo.id : azar().slice(0, 12);
       // Si fue reabierto, se reemplazan las novedades anteriores (borrando de a bloques de filas seguidas).
       // Los respaldos que ya estaban en Drive se conservan: la app los manda solo por nombre y aquí se recupera su link.
@@ -419,7 +442,7 @@ var ACCIONES = {
         filasNov.push({ envioId: id, periodo: q.periodo, rut: s.rut, trabajador: trab, tipo: String(n.tipo || '').slice(0, 40),
           detalle: det, comentario: com, respaldo: respaldo, respaldoUrl: adj ? adj.url : '', datos: datosTxt });
         if (trab && n.trabajadorNuevo && conocidos.indexOf(trab) < 0) { nuevos.push({ rut: s.rut, nombre: trab }); conocidos.push(trab); }
-        lineas.push({ trabajador: trab, tipo: String(n.tipo || ''), detalle: String(n.detalle || ''), comentario: String(n.comentario || ''), respaldo: adj ? adj.nombre : '', url: adj ? adj.url : '' });
+        lineas.push({ trabajador: trab, nueva: agrego && !!n.nueva, tipo: (agrego && n.nueva ? '🆕 ' : '') + String(n.tipo || ''), detalle: String(n.detalle || ''), comentario: String(n.comentario || ''), respaldo: adj ? adj.nombre : '', url: adj ? adj.url : '' });
         try { d = JSON.parse(datosTxt); } catch (err) {}
         paraApp.push({ trabajador: trab, tipo: String(n.tipo || '').slice(0, 40), detalle: det, comentario: com, datos: d, adjunto: respaldo ? { nombre: respaldo } : null });
       });
@@ -427,9 +450,10 @@ var ACCIONES = {
       var env = { id: id, periodo: q.periodo, rut: s.rut, empresa: e.nombre, fecha: ahora(), cantidad: lista.length, sinNovedades: !lista.length, estado: 'enviado', nota: '', carpeta: car ? car.getUrl() : (previo && previo.carpeta) || '' };
       if (previo) { env._fila = previo._fila; escribir('Envios', env); } else agregar('Envios', env);
       var cuantas = lista.length ? lista.length + (lista.length === 1 ? ' novedad' : ' novedades') : 'sin novedades';
-      registrar(s.rut, 'accion', e.nombre + ' envió ' + cuantas + ' de ' + nombreMes(q.periodo) + '.');
+      var nuevasN = lista.filter(function (n) { return n.nueva; }).length;
+      registrar(s.rut, 'accion', e.nombre + (agrego ? ' agregó ' + nuevasN + (nuevasN === 1 ? ' novedad' : ' novedades') + ' (' + cuantas + ' en total)' : ' envió ' + cuantas) + ' de ' + nombreMes(q.periodo) + '.');
       // La respuesta se arma con lo recién escrito (antes se releían 3 hojas completas desde la planilla).
-      return { ok: true, previo: !!previo, cuantas: cuantas, lineas: lineas, carpeta: env.carpeta, conRespaldos: lineas.some(function (l) { return !!l.url; }),
+      return { ok: true, previo: !!previo, agrego: agrego, nuevasN: nuevasN, cuantas: cuantas, lineas: lineas, carpeta: env.carpeta, conRespaldos: lineas.some(function (l) { return !!l.url; }),
         datos: { rut: s.rut, nombre: e.nombre, contacto: e.contacto, trabajadores: conocidos,
           mes: { enviado: env.fecha, revisado: false, ingresado: false, nota: null, novedades: paraApp, sinNovedades: !lista.length } } };
     });
@@ -439,20 +463,21 @@ var ACCIONES = {
     var para = deContyme(e.correoEncargada) ? e.correoEncargada : admins().join(',');
     var mes = nombreMes(q.periodo), Mes = mes.charAt(0).toUpperCase() + mes.slice(1);
     var sinEnc = !deContyme(e.correoEncargada);
-    var okAviso = correo(para, (previo ? '[Corregidas] ' : '') + 'Novedades ' + mes + ' · ' + e.nombre + ' (' + cuantas + ')', {
-      titulo: e.nombre + (previo ? ' corrigió sus novedades' : ' envió sus novedades'),
-      filas: [['Empresa', e.nombre], ['RUT', rutPuntos(s.rut)], ['Período', Mes], ['Novedades', lista.length ? String(lista.length) : 'Sin novedades este mes'], ['Enviado por', e.contacto || '—']],
+    var agrego = r.agrego, nuevasTxt = r.nuevasN + (r.nuevasN === 1 ? ' nueva' : ' nuevas');
+    var okAviso = correo(para, (agrego ? '[Más novedades] ' : previo ? '[Corregidas] ' : '') + 'Novedades ' + mes + ' · ' + e.nombre + ' (' + (agrego ? nuevasTxt + ', ' : '') + cuantas + ')', {
+      titulo: e.nombre + (agrego ? ' agregó ' + nuevasTxt + ' novedad' + (r.nuevasN === 1 ? '' : 'es') : previo ? ' corrigió sus novedades' : ' envió sus novedades'),
+      filas: [['Empresa', e.nombre], ['RUT', rutPuntos(s.rut)], ['Período', Mes], ['Novedades', lista.length ? String(lista.length) + (agrego ? ' (' + nuevasTxt + ', marcadas con 🆕)' : '') : 'Sin novedades este mes'], ['Enviado por', e.contacto || '—']],
       tabla: lineas,
       nota: (lista.length ? '' : 'La empresa avisó que este mes no hubo novedades: se repite la liquidación del mes anterior.\n') +
         (sinEnc ? 'Esta empresa no tiene encargada @contyme.cl: el aviso llegó a los administradores. Asígnala en Empresas (carga masiva).' : ''),
       boton: { txt: 'Abrir la bandeja', url: APP_URL },
       boton2: r.conRespaldos && r.carpeta ? { txt: 'Ver respaldos en Drive', url: r.carpeta } : null });
     var okConf = !!e.contacto && correo(e.contacto, 'Recibimos tus novedades de ' + mes + ' · ' + e.nombre, {
-      titulo: '¡Listo! Recibimos tus novedades',
+      titulo: agrego ? '¡Listo! Recibimos tus novedades nuevas' : '¡Listo! Recibimos tus novedades',
       intro: 'Contyme recibió las novedades de ' + mes + ' de ' + e.nombre + '. Este es el resumen de lo que enviaste:',
       filas: [['Empresa', e.nombre], ['Período', Mes], ['Novedades', lista.length ? String(lista.length) : 'Sin novedades este mes']],
       tabla: lineas.map(function (n) { return { trabajador: n.trabajador, tipo: n.tipo, detalle: n.detalle, comentario: n.comentario, respaldo: n.respaldo }; }),
-      nota: 'Si te faltó algo, responde este correo o escríbele a tu encargada y ella reabre tu envío.',
+      nota: 'Si te faltó algo, entra a la app y toca «Agregar más novedades». Para corregir algo ya enviado, responde este correo.',
       boton: { txt: 'Ver en qué va', url: APP_URL },
       responderA: sinEnc ? '' : e.correoEncargada });
     registrar(s.rut, 'correo', (okAviso ? 'Aviso a ' + para : 'NO se pudo avisar a ' + para + ' (revisar cuota de correos)') + (okConf ? ' y confirmación al cliente.' : ' · sin confirmación al cliente.'));
@@ -483,7 +508,7 @@ var ACCIONES = {
     }
     cache().remove('c:' + c);
     registrar('', 'seguridad', 'Ingreso de administrador: ' + c + '.');
-    return { ok: true, correo: c, token: nuevaSesion({ rol: 'admin', correo: c }, HORAS_SESION_ADMIN) };
+    return { ok: true, correo: c, token: nuevaSesion({ rol: 'admin', correo: c }, HORAS_SESION_ADMIN, !!q.recordar) };
   },
 
   'adm-datos': function (q) {

@@ -358,6 +358,7 @@ function cargarCliente(d) {
   const m = d.mes || {};
   /* enDrive: el respaldo ya está en la carpeta de Contyme; si piden corregir, no hay que volver a subirlo. */
   const enDrive = n => n.adjunto && !/\(no llegó el archivo\)$/.test(n.adjunto.nombre || '') ? { adjunto: Object.assign({}, n.adjunto, { enDrive: true }) } : {};
+  if (m.enviado && local.agregando && !local.enviado) { local.agregando = { enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, sinNovedades: !!m.sinNovedades }; guardar(); return; }
   if (m.enviado) s.meses[d.rut] = { novedades: (m.novedades || []).map((n, i) => Object.assign({ id: 'e' + i }, n, enDrive(n))), sinNovedades: !!m.sinNovedades, enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, nota: null };
   /* Reabierto: si en este dispositivo no hay un borrador propio, se trae lo enviado para corregirlo. */
   else if (m.reabierto && m.novedades && (local.enviado || (!local.novedades.length && !local.sinNovedades)))
@@ -489,8 +490,21 @@ async function prepararSemillas() {
 let listo = Promise.resolve();
 
 let sesion = null;
-try { sesion = JSON.parse(sessionStorage.getItem(SS)); } catch (e) { sesion = null; }
-function guardarSesion() { try { if (sesion) sessionStorage.setItem(SS, JSON.stringify(sesion)); else sessionStorage.removeItem(SS); } catch (e) {} }
+try { sesion = JSON.parse(sessionStorage.getItem(SS)) || JSON.parse(localStorage.getItem(SS)); } catch (e) { sesion = null; }
+/* «Recuérdame»: la sesión queda en este dispositivo (localStorage) y no se cierra por inactividad; si no, solo en esta pestaña. */
+function guardarSesion() {
+  try {
+    sessionStorage.removeItem(SS); localStorage.removeItem(SS);
+    if (sesion) (sesion.recordar ? localStorage : sessionStorage).setItem(SS, JSON.stringify(sesion));
+  } catch (e) {}
+}
+const LS_REC = 'novedades-contyme-recordar';
+function recordarme() { return leerLS(LS_REC) === '1'; }
+function chkRecordar() {
+  return '<label style="display:flex;gap:10px;align-items:flex-start;margin:6px 0 2px;font-size:15px;cursor:pointer"><input type="checkbox" id="recordar" style="width:20px;height:20px;margin-top:1px"' + (recordarme() ? ' checked' : '') + '>' +
+    '<span>Recuérdame en este dispositivo<span class="sub" style="display:block;font-size:13px">No tendrás que entrar de nuevo por 30 días. No lo marques en un computador compartido.</span></span></label>';
+}
+document.addEventListener('change', e => { if (e.target && e.target.id === 'recordar') escribirLS(LS_REC, e.target.checked ? '1' : '0'); });
 
 /* Archivos: solo en memoria de esta pestaña. Nunca a localStorage (son datos personales). */
 const previas = new Map();
@@ -519,7 +533,7 @@ const srv = {
   async ingresar(rutTxt, clave) {
     await listo;
     if (REMOTO) {
-      const r = await api('ingresar', { rut: rutTxt, clave, pre: await preClaveLista(rutTxt, clave) });
+      const r = await api('ingresar', { recordar: recordarme(), rut: rutTxt, clave, pre: await preClaveLista(rutTxt, clave) });
       if (r.ok) { cargarCliente(r.datos); return { ok: true, rut: r.rut, token: r.token }; }
       if (r.paso === 'crear') tickets.set(r.ticket, { rut: r.rut, remoto: true, vence: Date.now() + 10 * 60e3 });
       return r;
@@ -561,7 +575,7 @@ const srv = {
     if (!t || t.vence < Date.now()) return { error: 'Pasó mucho rato. Vuelve a empezar el ingreso.', reiniciar: true };
     if (t.remoto) {
       if (nueva !== repite) return { campo: 'repite', error: 'Las dos claves no son iguales.' };
-      const tk = tickets.get(ticket), r = await api('crear-clave', { ticket, nueva, correo, pre: tk ? await preClaveLista(tk.rut, nueva) : '' });
+      const tk = tickets.get(ticket), r = await api('crear-clave', { recordar: recordarme(), ticket, nueva, correo, pre: tk ? await preClaveLista(tk.rut, nueva) : '' });
       if (r.ok) { tickets.delete(ticket); cargarCliente(r.datos); return { ok: true, rut: r.rut, token: r.token }; }
       return r;
     }
@@ -612,9 +626,22 @@ const srv = {
       m.novedades.push(Object.assign({ id, creada: ahora() }, limpia)); m.sinNovedades = false;
       guardar(); return { ok: true, id };
     },
+    /* Mes ya enviado → borrador con lo enviado (bloqueado) + lo nuevo. Al enviar, Contyme recibe todo con lo nuevo marcado. */
+    agregarMas() {
+      const m = s.meses[soyCliente()]; if (!m.enviado) return;
+      m.agregando = { enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, sinNovedades: !!m.sinNovedades };
+      if (m.sinNovedades) m.novedades = [];
+      m.novedades.forEach(n => { n.yaEnviada = true; });
+      m.enviado = null; m.revisado = false; m.ingresado = false; m.sinNovedades = false; m.nota = null; guardar();
+    },
+    cancelarAgregar() {
+      const m = s.meses[soyCliente()]; if (!m.agregando) return;
+      m.novedades = m.novedades.filter(n => n.yaEnviada); m.novedades.forEach(n => { delete n.yaEnviada; });
+      Object.assign(m, m.agregando); delete m.agregando; guardar();
+    },
     quitar(id) {
       const m = s.meses[soyCliente()]; if (m.enviado) return null;
-      const i = m.novedades.findIndex(x => String(x.id) === String(id)); if (i < 0) return null;
+      const i = m.novedades.findIndex(x => String(x.id) === String(id)); if (i < 0 || m.novedades[i].yaEnviada) return null;
       const [n] = m.novedades.splice(i, 1); guardar(); return { n, i };
     },
     restaurar(n, i) { const m = s.meses[soyCliente()]; if (m.enviado) return; m.novedades.splice(Math.min(i, m.novedades.length), 0, n); m.sinNovedades = false; guardar(); },
@@ -623,6 +650,7 @@ const srv = {
       const rut = soyCliente(), m = s.meses[rut], e = s.remutyme[rut], c = s.cuentas[rut];
       if (m.enviado) return { error: 'Ya estaba enviado.' };
       if (!m.novedades.length && !m.sinNovedades) return { error: 'Agrega una novedad o marca que no hubo novedades.' };
+      if (m.agregando && !m.novedades.some(n => !n.yaEnviada)) return { error: 'Agrega al menos una novedad nueva, o toca «Cancelar» para dejarlo como estaba.' };
       if (REMOTO) {
         const sinArchivo = m.novedades.filter(n => n.adjunto && !archivosMem.has(n.id) && !n.adjunto.enDrive);
         if (sinArchivo.length) return { error: 'Vuelve a adjuntar el respaldo de ' + sinArchivo.map(n => n.trabajador).join(', ') + ' (se pierde al cerrar la app). Toca la novedad → Editar.' };
@@ -637,17 +665,17 @@ const srv = {
         }
         const mb = archivos.reduce((t, a) => t + a.base64.length * 0.75, 0) / 1048576;
         if (avance) avance(archivos.length ? 'Subiendo tus novedades y ' + plural(archivos.length, 'respaldo', 'respaldos') + ' (' + fmtNum(Math.max(0.1, mb)) + ' MB)… Con fotos puede tardar hasta un minuto.' : 'Enviando a Contyme…');
-        const lista = m.novedades.map(n => ({ trabajador: n.trabajador, tipo: n.tipo, detalle: detalle(n), comentario: n.comentario, datos: n.datos, adjunto: n.adjunto ? { nombre: n.adjunto.nombre } : null, trabajadorNuevo: !!n.trabajadorNuevo }));
-        let r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos }, 180000);
+        const lista = m.novedades.map(n => ({ trabajador: n.trabajador, tipo: n.tipo, detalle: detalle(n), comentario: n.comentario, datos: n.datos, adjunto: n.adjunto ? { nombre: n.adjunto.nombre } : null, trabajadorNuevo: !!n.trabajadorNuevo, nueva: !n.yaEnviada }));
+        let r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos, agregar: !!m.agregando }, 180000);
         if (r.error && !r.salir) {
           /* Si se cortó la señal pero Contyme sí lo recibió (o fue un doble toque), se muestra como enviado en vez de un error. */
           const v = await api('cli-datos');
-          if (v.ok && v.datos && v.datos.mes && v.datos.mes.enviado) r = { ok: true, datos: v.datos };
+          if (v.ok && v.datos && v.datos.mes && v.datos.mes.enviado && (!m.agregando || v.datos.mes.enviado !== m.agregando.enviado)) r = { ok: true, datos: v.datos };
         }
         if (r.error) return r;
-        archivosMem.clear(); cargarCliente(r.datos); return { ok: true };
+        archivosMem.clear(); delete m.agregando; cargarCliente(r.datos); return { ok: true };
       }
-      m.enviado = ahora(); m.revisado = false; m.ingresado = false; m.nota = null;
+      m.enviado = ahora(); m.revisado = false; m.ingresado = false; m.nota = null; delete m.agregando; m.novedades.forEach(n => { delete n.yaEnviada; });
       const cuantas = m.novedades.length ? plural(m.novedades.length, 'novedad', 'novedades') : 'sin novedades';
       registrar(rut, 'accion', e.nombre + ' envió ' + cuantas + ' de ' + CONFIG.periodo.mes + ' a la bandeja de RRHH.');
       registrar(rut, 'correo', 'Aviso a la encargada de ' + e.cartera + ': «' + e.nombre + ' envió ' + cuantas + '». (El correo no lleva las novedades: solo avisa.)');
@@ -791,7 +819,7 @@ function vistaLogin() {
       input('nueva', 'Nueva clave', { type: 'password', ac: 'new-password', pass: true, ayuda: 'Mínimo ' + CONFIG.claveMin + ' caracteres, con letras y números.' }) +
       input('repite', 'Repite la clave', { type: 'password', ac: 'new-password', pass: true }) +
       input('contacto', 'Correo de contacto', { type: 'email', ac: 'email', im: 'email', ph: 'nombre@tuempresa.cl', ayuda: 'Ahí te llega la confirmación de cada envío.' }) +
-      errorGeneral() +
+      (REMOTO ? chkRecordar() : '') + errorGeneral() +
       '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Guardando…' : 'Guardar y entrar') + '</button>' +
       '<button type="button" class="btn-link" data-a="paso" data-v="rut">Cancelar</button></form>';
   } else if (ui.paso === 'olvide') {
@@ -804,7 +832,7 @@ function vistaLogin() {
   } else if (ui.paso === 'admin-codigo') {
     cuerpo = '<form id="f-codigo" novalidate class="login-cuerpo gutter"><h2 id="titulo" tabindex="-1">Revisa tu correo</h2>' +
       '<p class="sub">Si <b>' + esc(ui.adminCorreo) + '</b> tiene acceso, le mandamos un código de 6 números. Vence en 10 minutos.</p>' +
-      input('a-codigo', 'Código', { im: 'numeric', ac: 'one-time-code', ph: '000000', max: 6 }) + errorGeneral() +
+      input('a-codigo', 'Código', { im: 'numeric', ac: 'one-time-code', ph: '000000', max: 6 }) + chkRecordar() + errorGeneral() +
       '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Entrando…' : 'Entrar') + '</button>' +
       '<button type="button" class="btn-link" data-a="paso" data-v="contyme">Usar otro correo</button></form>';
   } else if (ui.paso === 'contyme') {
@@ -829,7 +857,7 @@ function vistaLogin() {
       (ui.aviso ? '<div class="nota nota-info" role="status">' + esc(ui.aviso) + '</div>' : '') +
       input('rut', 'RUT de la empresa', { ac: 'username', ph: 'Ej. 99.000.100-6', ayuda: 'Con o sin puntos, con guion y dígito verificador.' }) +
       input('clave', 'Clave', { type: 'password', ac: 'current-password', pass: true, ayuda: ayudaClave, despues: '<span class="err-campo" id="caps" hidden>Tienes activadas las MAYÚSCULAS.</span>' }) +
-      errorGeneral() +
+      (REMOTO ? chkRecordar() : '') + errorGeneral() +
       '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Entrando…' : 'Entrar') + '</button>' +
       '<button type="button" class="btn-link" data-a="paso" data-v="olvide">Olvidé mi clave</button>' + demo + '</form>';
   }
@@ -862,10 +890,11 @@ function itemNovedad(n, o) {
   if (n.adjunto) { const u = previas.get(n.id); adj = '<div class="adj">' + (u && /^image\//.test(n.adjunto.mime) ? '<img src="' + esc(u) + '" alt="Respaldo de ' + esc(n.trabajador) + '">' : '') + 'Respaldo: ' + (n.adjunto.url ? '<a href="' + esc(n.adjunto.url) + '" target="_blank" rel="noopener">' + esc(n.adjunto.nombre) + '</a>' : esc(n.adjunto.nombre)) + '</div>'; }
   const marcas = [];
   if (n.ejemplo) marcas.push('<span class="pill p-neutro">Ejemplo</span>');
+  if (n.yaEnviada) marcas.push('<span class="pill p-ok">Ya enviada</span>');
   if (def.importante && !n.adjunto) marcas.push('<span class="pill p-warn">Falta respaldo</span>');
   if (n.trabajadorNuevo) marcas.push('<span class="pill p-info">No está en la lista</span>');
   if (n.tipo === 'Ingreso') marcas.push('<span class="pill p-info">Trabajador nuevo</span>');
-  const acc = o.editable ? '<div class="nov-acc"><button type="button" class="icon-btn" data-a="editar" data-v="' + n.id + '" aria-label="Editar la novedad de ' + esc(n.trabajador) + '">' + ICO.lapiz + '</button>' +
+  const acc = o.editable && !n.yaEnviada ? '<div class="nov-acc"><button type="button" class="icon-btn" data-a="editar" data-v="' + n.id + '" aria-label="Editar la novedad de ' + esc(n.trabajador) + '">' + ICO.lapiz + '</button>' +
     '<button type="button" class="icon-btn" data-a="quitar" data-v="' + n.id + '" aria-label="Quitar la novedad de ' + esc(n.trabajador) + '">' + ICO.x + '</button></div>' : '';
   return '<li class="nov"><span class="avatar" aria-hidden="true">' + esc(n.trabajador.charAt(0)) + '</span><div class="nov-txt">' +
     '<strong>' + esc(n.trabajador) + '</strong><span class="nov-tipo">' + esc(n.tipo) + '</span><span>' + esc(detalle(n)) + '</span>' +
@@ -874,12 +903,14 @@ function itemNovedad(n, o) {
 function cliMes(d) {
   const m = d.mes, n = m.novedades.length;
   if (m.enviado) return cliEnviado(d);
+  const agr = m.agregando ? '<div class="nota nota-info" role="status"><strong>Agregando novedades a lo que ya enviaste</strong><span>Lo marcado «Ya enviada» no se cambia. Suma lo nuevo y toca «Enviar a Contyme»: tu encargada recibe todo junto, con lo nuevo destacado.</span><button type="button" class="btn-link" data-a="cancelar-agregar">Cancelar y dejarlo como estaba</button></div>' : '';
   const nota = m.nota ? '<div class="nota nota-crit" role="status"><strong>Contyme te pidió revisar tu envío</strong><span>«' + esc(m.nota) + '»</span><span>Corrige lo que haga falta y vuelve a enviar.</span></div>' : '';
   const lista = n ? '<ul class="lista">' + m.novedades.map(x => itemNovedad(x, { editable: true })).join('') + '</ul>'
     : (m.sinNovedades ? '<div class="vacio"><strong>Sin novedades este mes</strong><span class="sub">Haremos las liquidaciones igual que el mes pasado.</span><button type="button" class="btn-link" data-a="sin-nov" data-v="no">Me equivoqué, sí hubo novedades</button></div>'
       : '<div class="vacio"><strong>Todavía no hay novedades</strong><span class="sub">Agrega una por cada cosa que pasó: horas extra, una licencia, un bono…</span></div>');
-  const puede = n || m.sinNovedades;
-  return nota + '<div class="fila-titulo"><h2 id="titulo" tabindex="-1">Este mes</h2><span class="sub">' + plural(n, 'novedad', 'novedades') + ' en borrador</span></div>' + lista +
+  const puede = m.agregando ? m.novedades.some(x => !x.yaEnviada) : (n || m.sinNovedades);
+  const nuevas = m.agregando ? m.novedades.filter(x => !x.yaEnviada).length : n;
+  return agr + nota + '<div class="fila-titulo"><h2 id="titulo" tabindex="-1">Este mes</h2><span class="sub">' + (m.agregando ? plural(nuevas, 'novedad nueva', 'novedades nuevas') : plural(n, 'novedad', 'novedades') + ' en borrador') + '</span></div>' + lista +
     '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' +
     (n || m.sinNovedades ? '' : '<button type="button" class="btn-link" data-a="sin-nov" data-v="si">No tuve novedades este mes</button>') +
     errorGeneral() + (ui.enviando ? '<div class="nota nota-info" role="status"><strong>' + esc(ui.enviando) + '</strong><span>No cierres la app hasta que diga «Enviado». Tu borrador sigue guardado.</span></div>' : '') +
@@ -897,10 +928,11 @@ function cliEnviado(d) {
       '<li class="paso' + (p[2] ? ' hecho' : '') + '"><div class="paso-marca"><span class="punto">' + (p[2] ? ICO.checkChico : '') + '</span>' + (i < pasos.length - 1 ? '<span class="linea"></span>' : '') + '</div>' +
       '<div class="paso-txt"><strong>' + p[0] + '<span class="sr">' + (p[2] ? ' (hecho)' : ' (pendiente)') + '</span></strong><span>' + esc(p[1]) + '</span></div></li>').join('') + '</ol>' +
     (n ? '<h2 style="font-size:19px">Lo que enviaste</h2><ul class="lista">' + m.novedades.map(x => itemNovedad(x)).join('') + '</ul>' : '') +
-    '<p class="sub centro">¿Te faltó algo? Escríbele a tu encargada de remuneraciones y ella reabre tu envío.</p>';
+    '<button type="button" class="btn btn-sec" data-a="agregar-mas">+ Agregar más novedades</button>' +
+    '<p class="sub centro">¿Pasó algo más este mes? Agrégalo cuando quieras. Para corregir algo ya enviado, escríbele a tu encargada.</p>';
 }
 function cliNueva(d) {
-  if (d.mes.enviado) return '<div class="vacio"><h2 id="titulo" tabindex="-1" style="font-size:18px">Ya enviaste ' + esc(CONFIG.periodo.mes) + '</h2><span class="sub">Si te faltó algo, escríbele a tu encargada y ella reabre tu envío.</span></div>';
+  if (d.mes.enviado) return '<div class="vacio"><h2 id="titulo" tabindex="-1" style="font-size:18px">Ya enviaste ' + esc(CONFIG.periodo.mes) + '</h2><span class="sub">¿Pasó algo más? Agrégalo y se lo mandamos a tu encargada.</span><button type="button" class="btn btn-sec" data-a="agregar-mas">+ Agregar más novedades</button></div>';
   const editando = ui.editando != null, def = ui.tipo ? TIPOS[ui.tipo] : null;
   let html = '<div class="fila-titulo"><h2 id="titulo" tabindex="-1" style="font-size:21px">' + (editando ? 'Editar novedad' : 'Nueva novedad') + '</h2></div><form id="f-nov" novalidate style="display:flex;flex-direction:column;gap:20px">' +
     '<fieldset><legend><span class="num" aria-hidden="true">1</span>¿Qué pasó?</legend><div class="tipos">' +
@@ -1180,11 +1212,11 @@ function cerrarSesion(motivo, sinPintar) {
 }
 function tocar() { if (sesion) { sesion.ultimo = Date.now(); guardarSesion(); } }
 setInterval(() => {
-  if (sesion && Date.now() - (sesion.ultimo || 0) > CONFIG.minutosInactividad * 60e3) {
+  if (sesion && !sesion.recordar && Date.now() - (sesion.ultimo || 0) > CONFIG.minutosInactividad * 60e3) {
     cerrarSesion('Por seguridad cerramos la sesión tras ' + CONFIG.minutosInactividad + ' minutos sin uso. Vuelve a entrar para seguir; tu borrador quedó guardado.');
   }
 }, 30e3);
-if (sesion && Date.now() - (sesion.ultimo || 0) > CONFIG.minutosInactividad * 60e3) cerrarSesion('Por seguridad cerramos la sesión por inactividad.', true);
+if (sesion && !sesion.recordar && Date.now() - (sesion.ultimo || 0) > CONFIG.minutosInactividad * 60e3) cerrarSesion('Por seguridad cerramos la sesión por inactividad.', true);
 
 /* ---------- Navegación del cliente ---------- */
 function ir(tab, mantener) {
@@ -1212,6 +1244,8 @@ function copiar(texto) {
 
 /* ---------- Acciones (clic) ---------- */
 const ACC = {
+  'agregar-mas': () => { srv.cli.agregarMas(); ui.tab = 'mes'; ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Agrega lo nuevo y envíalo'); },
+  'cancelar-agregar': () => { srv.cli.cancelarAgregar(); ui.foco = 'titulo'; pintar(); toast('Quedó como estaba'); },
   'que-simulado': () => dialogo({ titulo: CONFIG.demo ? 'Qué es simulado en esta demo' : 'Sobre esta versión piloto', cancelar: 'Entendido', html: '<ul>' +
     '<li><b>El acceso.</b> RUT, claves e intentos se revisan en este navegador. Cualquiera con el código puede saltárselo: no es seguridad real. En la versión real lo hace el servidor de Remutyme.</li>' +
     '<li><b>Los datos.</b> ' + (CONFIG.demo ? 'Son ficticios y quedan' : 'Quedan') + ' solo en este navegador: todavía no se envían a un servidor de Contyme.</li>' +
@@ -1260,11 +1294,11 @@ const ACC = {
     const faltan = m.novedades.filter(x => TIPOS[x.tipo] && TIPOS[x.tipo].importante && !x.adjunto);
     const ejemplos = m.novedades.filter(x => x.ejemplo).length;
     dialogo({
-      titulo: n ? '¿Enviar ' + plural(n, 'novedad', 'novedades') + ' a Contyme?' : '¿Avisar que no hubo novedades?',
-      html: (n ? '<ul>' + m.novedades.map(x => '<li><b>' + esc(x.trabajador) + '</b>: ' + esc(x.tipo.toLowerCase()) + ' · ' + esc(detalle(x)) + '</li>').join('') + '</ul>' : '<p>Contyme hará las liquidaciones de ' + esc(CONFIG.periodo.mes) + ' igual que el mes pasado.</p>') +
+      titulo: m.agregando ? '¿Enviar ' + plural(m.novedades.filter(x => !x.yaEnviada).length, 'novedad nueva', 'novedades nuevas') + ' a Contyme?' : n ? '¿Enviar ' + plural(n, 'novedad', 'novedades') + ' a Contyme?' : '¿Avisar que no hubo novedades?',
+      html: (n ? '<ul>' + m.novedades.filter(x => !x.yaEnviada).map(x => '<li><b>' + esc(x.trabajador) + '</b>: ' + esc(x.tipo.toLowerCase()) + ' · ' + esc(detalle(x)) + '</li>').join('') + '</ul>' : '<p>Contyme hará las liquidaciones de ' + esc(CONFIG.periodo.mes) + ' igual que el mes pasado.</p>') +
         (faltan.length ? '<div class="nota nota-warn">' + plural(faltan.length, 'novedad no tiene', 'novedades no tienen') + ' respaldo (' + esc(faltan.map(x => x.trabajador).join(', ')) + '). Puedes enviar igual; Contyme te lo pedirá.</div>' : '') +
         (ejemplos ? '<div class="nota nota-info">Hay ' + plural(ejemplos, 'novedad de ejemplo', 'novedades de ejemplo') + ' de la demo. Quítalas si no corresponden.</div>' : '') +
-        '<p class="sub">Después de enviar ya no puedes cambiarlas. Si te falta algo, tu encargada puede reabrir el envío.</p>',
+        '<p class="sub">Después de enviar ya no puedes cambiarlas, pero sí agregar más durante el mes.</p>',
       ok: 'Sí, enviar', cancelar: 'Revisar de nuevo',
       accion: () => {
         if (ui.enviando) return;
@@ -1415,9 +1449,9 @@ const SUB = {
     const cod = String(val('a-codigo')).replace(/\D/g, '');
     if (cod.length !== 6) return falla('a-codigo', 'El código tiene 6 números.');
     ui.cargando = true; pintar();
-    const r = await api('admin-entrar', { correo: ui.adminCorreo, codigo: cod, conDatos: true }); ui.cargando = false;
+    const r = await api('admin-entrar', { correo: ui.adminCorreo, codigo: cod, conDatos: true, recordar: recordarme() }); ui.cargando = false;
     if (!r.ok) { ui.err = { campo: r.campo || null, msg: r.error }; ui.foco = 'a-codigo'; pintar(); return; }
-    sesion = { rol: 'admin', correo: r.correo, token: r.token, ultimo: Date.now() }; guardarSesion();
+    sesion = { rol: 'admin', correo: r.correo, token: r.token, ultimo: Date.now(), recordar: recordarme() }; guardarSesion();
     await cargarAdmin(r.datosAdm);
     entrar(sesion, 'Hola, ' + r.correo.split('@')[0]);
   },
@@ -1444,7 +1478,7 @@ const SUB = {
     ui.cargando = true; ui.err = null; ui.aviso = ''; pintar();
     let r; try { r = await srv.ingresar(rutTxt, clave); } catch (e) { r = { error: 'No pudimos revisar la clave. Intenta de nuevo.' }; }
     ui.cargando = false;
-    if (r.ok) { escribirLS(LS_RUT, rutBonito(r.rut)); entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.ok) { escribirLS(LS_RUT, rutBonito(r.rut)); entrar({ rol: 'cliente', rut: r.rut, token: r.token, recordar: REMOTO && recordarme() }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
     if (r.paso === 'crear') { ui.paso = 'crear'; ui.ticket = r.ticket; ui.crearPara = { rut: r.rut, nombre: r.nombre }; ui.form = {}; ui.foco = 'nueva'; pintar(); return; }
     ui.form.clave = ''; falla(r.campo, r.error);
   },
@@ -1453,7 +1487,7 @@ const SUB = {
     ui.cargando = true; ui.err = null; pintar();
     let r; try { r = await srv.crearClave(ui.ticket, val('nueva'), val('repite'), val('contacto')); } catch (e) { r = { error: 'No pudimos guardar la clave. Intenta de nuevo.' }; }
     ui.cargando = false;
-    if (r.ok) { escribirLS(LS_RUT, rutBonito(r.rut)); entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.ok) { escribirLS(LS_RUT, rutBonito(r.rut)); entrar({ rol: 'cliente', rut: r.rut, token: r.token, recordar: REMOTO && recordarme() }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
     if (r.reiniciar) { ui.paso = 'rut'; ui.form = {}; }
     if (r.campo === 'nueva' || r.campo === 'repite') { ui.form.repite = ''; }
     falla(r.campo, r.error);
