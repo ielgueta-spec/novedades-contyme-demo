@@ -1,9 +1,9 @@
-﻿/* Service worker de Â«Novedades ContymeÂ».
- * - Guarda la app (pÃ¡gina, manifiesto, Ã­conos) al instalarse: abre sin internet.
- * - PÃ¡gina: primero la red (para tomar la versiÃ³n nueva), si no hay red la guardada.
- * - Las fuentes vienen dentro de la app (carpeta fuentes/).
- * Al cambiar algo de la app, subir VERSION para que los telÃ©fonos tomen la nueva. */
-const VERSION = 'novedades-v12';
+﻿/* Service worker de «Novedades Remuneraciones» (Contyme).
+ * - Guarda la app (página, manifiesto, íconos, fuentes) al instalarse: abre sin internet.
+ * - Página: primero la red, sin caché del navegador (para tomar siempre la versión nueva); sin red, la guardada.
+ * - Cada mejora: subir VERSION aquí y VERSION_APP en index.html (mismo número). Los teléfonos instalados la detectan
+ *   al abrir la app o al volver a ella, y se recargan solos cuando la persona no está a mitad de algo. */
+const VERSION = 'novedades-v13';
 const APP = [
   './',
   'index.html',
@@ -20,7 +20,11 @@ const APP = [
 ];
 
 self.addEventListener('install', (e) => {
-  e.waitUntil(caches.open(VERSION).then((c) => c.addAll(APP)).then(() => self.skipWaiting()));
+  e.waitUntil(
+    caches.open(VERSION)
+      .then((c) => c.addAll(APP.map((u) => new Request(u, { cache: 'reload' }))))
+      .then(() => self.skipWaiting()),
+  );
 });
 
 self.addEventListener('activate', (e) => {
@@ -38,8 +42,8 @@ self.addEventListener('fetch', (e) => {
 
   if (req.mode === 'navigate') {
     e.respondWith(
-      fetch(req)
-        .then((r) => { const copia = r.clone(); caches.open(VERSION).then((c) => c.put('index.html', copia)); return r; })
+      fetch(req.url, { cache: 'no-cache', credentials: 'same-origin' })
+        .then((r) => { if (r.ok) { const copia = r.clone(); caches.open(VERSION).then((c) => c.put('index.html', copia)); } return r; })
         .catch(() => caches.match('index.html')),
     );
     return;

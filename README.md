@@ -57,3 +57,14 @@ administradores): cada función se convierte en un endpoint del servidor.
 - Correos reales (aviso a la encargada, confirmación, recordatorio, activación) sin novedades ni claves.
 - Período, plazo, empresas y trabajadores desde Remutyme.
 - La clave inicial real nunca puede ser la de esta demo.
+
+## Publicar una mejora (llega sola a los teléfonos)
+
+1. Haz el cambio en `index.html` (y/o `servidor/Code.gs`).
+2. Sube **el mismo número** en `sw.js` (`VERSION = 'novedades-vN'`) y en `index.html` (`VERSION_APP = N`).
+3. `git push` a `main`. GitHub Pages publica en 1–2 minutos.
+4. Si cambió `Code.gs`: pegarlo en Apps Script → Implementar → Gestionar implementaciones → lápiz → **Nueva versión**.
+
+Las apps instaladas (iPhone y Android) buscan la versión nueva al abrirse, al volver a primer plano y cada 15 minutos,
+y se recargan solas cuando la persona no está escribiendo, enviando ni con un diálogo abierto. El número de versión
+se ve abajo en la pantalla de ingreso. Excepción: en iPhone, el ícono y el nombre bajo el ícono solo cambian reinstalando.

@@ -257,6 +257,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
+const VERSION_APP = 13; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -866,7 +867,8 @@ function vistaLogin() {
   }
   return '<div class="login"><header class="login-top gutter"><img class="logo-login" src="iconos/logo-contyme-blanco-520.png" alt="Contyme · Asesores, Auditores, Contables" width="190" height="54"><h1>Novedades Remuneraciones</h1><p>Envía a Contyme lo que pasó con tus trabajadores este mes para hacer las liquidaciones.</p></header>' +
     '<main id="principal">' + cuerpo + '</main>' +
-    (ui.paso === 'rut' ? '<p class="pie-login"><button type="button" class="btn-link chico" data-a="paso" data-v="contyme">Acceso equipo Contyme</button></p>' : '') + '</div>';
+    (ui.paso === 'rut' ? '<p class="pie-login"><button type="button" class="btn-link chico" data-a="paso" data-v="contyme">Acceso equipo Contyme</button></p>' : '') +
+    '<p class="sub centro" style="font-size:12px;opacity:.7;margin:4px 0 16px">Versión ' + VERSION_APP + '</p></div>';
 }
 
 /* ---------- Vista: cliente ---------- */
@@ -1559,14 +1561,31 @@ if (REMOTO) {
 if (REMOTO && sesion && sesion.token) {
   (sesion.rol === 'admin' ? cargarAdmin() : api('cli-datos').then(r => { if (r.ok) cargarCliente(r.datos); })).then(() => { if (sesion) pintar(); });
 }
+
+/* ---------- Actualización automática (PWA) ----------
+ * Al abrir la app o volver a ella se busca una versión nueva. Si llega, la app se recarga sola, salvo que la persona
+ * esté escribiendo, enviando o con un diálogo abierto: en ese caso espera a que termine. El borrador nunca se pierde. */
+if ('serviceWorker' in navigator) {
+  const habiaVersion = !!navigator.serviceWorker.controller;
+  let porRecargar = false, recargando = false;
+  const ocupado = () => !!(ui.enviando || ui.cargando || ui.tipo || ui.editando != null || document.querySelector('dialog[open], [role="dialog"]') ||
+    (document.activeElement && /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)));
+  const recargar = () => { if (recargando) return; recargando = true; try { sessionStorage.setItem('novedades-actualizada', '1'); } catch (e) {} location.reload(); };
+  const intentar = () => { if (porRecargar && !ocupado()) recargar(); };
+  navigator.serviceWorker.addEventListener('controllerchange', () => { if (!habiaVersion) return; porRecargar = true; intentar(); });
+  setInterval(intentar, 5000);
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then(reg => {
+      const buscar = () => { if (navigator.onLine !== false) reg.update().catch(() => {}); };
+      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') { buscar(); intentar(); } });
+      window.addEventListener('online', buscar);
+      setInterval(buscar, 15 * 60e3);
+    }).catch(() => {});
+  });
+  try { if (sessionStorage.getItem('novedades-actualizada')) { sessionStorage.removeItem('novedades-actualizada'); setTimeout(() => toast('App actualizada a la versión ' + VERSION_APP), 600); } } catch (e) {}
+}
 })();
 </script>
 
-<script>
-/* PWA: el service worker guarda la app para abrirla sin internet. */
-if ('serviceWorker' in navigator) {
-  window.addEventListener('load', function () { navigator.serviceWorker.register('sw.js').catch(function () {}); });
-}
-</script>
 </body>
 </html>
