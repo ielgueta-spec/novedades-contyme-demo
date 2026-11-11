@@ -3,7 +3,7 @@
  * - Página: primero la red (para tomar la versión nueva), si no hay red la guardada.
  * - Las fuentes vienen dentro de la app (carpeta fuentes/).
  * Al cambiar algo de la app, subir VERSION para que los teléfonos tomen la nueva. */
-const VERSION = 'novedades-v5';
+const VERSION = 'novedades-v6';
 const APP = [
   './',
   'index.html',
