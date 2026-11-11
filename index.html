@@ -108,6 +108,11 @@ main.cli { flex: 1; padding-block: 18px 28px; display: flex; flex-direction: col
 .nov-txt { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; }
 .nov-txt > span { color: var(--muted); font-size: 15px; overflow-wrap: anywhere; }
 .nov-tipo { font-weight: 700; color: var(--brand-ink) !important; }
+.trab-lista li { list-style: none; }
+.trab-btn { width: 100%; display: flex; align-items: center; gap: 12px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); color: var(--fg); font: inherit; text-align: left; cursor: pointer; }
+.trab-btn:hover { border-color: var(--brand-ink); }
+.trab-nom { flex: 1; font-weight: 600; min-width: 0; overflow-wrap: anywhere; }
+.trab-mas { flex: none; width: 32px; height: 32px; border-radius: 50%; background: var(--brand-soft); color: var(--brand-ink); display: grid; place-items: center; font-size: 22px; font-weight: 700; }
 .marcas { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 2px; }
 .adj { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--brand-ink); font-weight: 600; overflow-wrap: anywhere; }
 .adj img { width: 44px; height: 44px; object-fit: cover; border-radius: 8px; border: 1px solid var(--line); }
@@ -257,7 +262,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 15; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 16; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -923,12 +928,25 @@ function cliMes(d) {
   const puede = m.agregando ? m.novedades.some(x => !x.yaEnviada) : (n || m.sinNovedades);
   const nuevas = m.agregando ? m.novedades.filter(x => !x.yaEnviada).length : n;
   return agr + nota + '<div class="fila-titulo"><h2 id="titulo" tabindex="-1">Este mes</h2><span class="sub">' + (m.agregando ? plural(nuevas, 'novedad nueva', 'novedades nuevas') : plural(n, 'novedad', 'novedades') + ' en borrador') + '</span></div>' + lista +
-    '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' +
+    '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' + listaTrabajadores(d) +
     (n || m.sinNovedades ? '' : '<button type="button" class="btn-link" data-a="sin-nov" data-v="si">No tuve novedades este mes</button>') +
     errorGeneral() + (ui.enviando ? '<div class="nota nota-info" role="status"><strong>' + esc(ui.enviando) + '</strong><span>No cierres la app hasta que diga «Enviado». Tu borrador sigue guardado.</span></div>' : '') +
     '<button type="button" class="btn btn-pri" data-a="enviar"' + (puede && !ui.enviando ? '' : ' disabled') + (puede ? '' : ' aria-describedby="envio-ay"') + (ui.enviando ? ' aria-busy="true"' : '') + '>' +
     (ui.enviando ? '<span class="gira" aria-hidden="true"></span>Enviando…' : 'Enviar a Contyme') + '</button>' +
     '<p class="sub centro" id="envio-ay">' + (puede ? 'Al enviar, tus novedades quedan en la bandeja de Remuneraciones de Contyme y le avisamos a tu encargada. Hasta entonces es solo un borrador.' : 'Para enviar, agrega una novedad o marca que no hubo novedades.') + '</p>';
+}
+function listaTrabajadores(d) {
+  const lista = (d.trabajadores || []).slice().sort((a, b) => a.localeCompare(b, 'es'));
+  if (!lista.length) return '';
+  const cuenta = {}; (d.mes.novedades || []).forEach(n => { cuenta[n.trabajador] = (cuenta[n.trabajador] || 0) + 1; });
+  return '<h2 style="font-size:19px;margin-top:26px">Tus trabajadores</h2><p class="sub" style="margin-top:-4px">Toca uno para agregarle una novedad.</p>' +
+    '<ul class="lista trab-lista" style="margin-top:8px">' + lista.map(nom => {
+      const i = d.trabajadores.indexOf(nom), c = cuenta[nom] || 0;
+      return '<li><button type="button" class="trab-btn" data-a="nueva-para" data-v="' + i + '" aria-label="Agregar novedad a ' + esc(nom) + '">' +
+        '<span class="avatar" aria-hidden="true">' + esc(nom.charAt(0)) + '</span><span class="trab-nom">' + esc(nom) +
+        (c ? '<span class="sub" style="display:block;font-size:14px">' + plural(c, 'novedad este mes', 'novedades este mes') + '</span>' : '') + '</span>' +
+        '<span class="trab-mas" aria-hidden="true">+</span></button></li>';
+    }).join('') + '</ul>';
 }
 function cliEnviado(d) {
   const m = d.mes, n = m.novedades.length;
@@ -940,7 +958,7 @@ function cliEnviado(d) {
       '<li class="paso' + (p[2] ? ' hecho' : '') + '"><div class="paso-marca"><span class="punto">' + (p[2] ? ICO.checkChico : '') + '</span>' + (i < pasos.length - 1 ? '<span class="linea"></span>' : '') + '</div>' +
       '<div class="paso-txt"><strong>' + p[0] + '<span class="sr">' + (p[2] ? ' (hecho)' : ' (pendiente)') + '</span></strong><span>' + esc(p[1]) + '</span></div></li>').join('') + '</ol>' +
     (n ? '<h2 style="font-size:19px">Lo que enviaste</h2><ul class="lista">' + m.novedades.map(x => itemNovedad(x)).join('') + '</ul>' : '') +
-    '<button type="button" class="btn btn-sec" data-a="agregar-mas">+ Agregar más novedades</button>' +
+    '<button type="button" class="btn btn-sec" data-a="agregar-mas">+ Agregar más novedades</button>' + listaTrabajadores(d) +
     '<p class="sub centro">¿Pasó algo más este mes? Agrégalo cuando quieras. Para corregir algo ya enviado, escríbele a tu encargada.</p>';
 }
 function cliNueva(d) {
@@ -1288,6 +1306,11 @@ const ACC = {
   actualizar: async () => { toast('Actualizando…'); if (await cargarAdmin()) { pintar(); toast('Al día'); } },
   tab: v => ir(v, v === ui.tab && v === 'nueva'),
   nueva: () => ir('nueva'),
+  'nueva-para': v => {
+    const d = srv.cli.datos(), nom = (d.trabajadores || [])[Number(v)]; if (!nom) return;
+    if (d.mes.enviado) srv.cli.agregarMas();
+    ir('nueva'); ui.form.trabajador = nom; ui.foco = 'titulo'; pintar(); toast('Novedad para ' + nom + ': elige qué pasó');
+  },
   tipo: v => {
     if (!TIPOS[v]) return;
     ui.tipo = v; ui.err = null;
