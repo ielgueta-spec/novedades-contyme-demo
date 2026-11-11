@@ -317,8 +317,8 @@ function cargarCliente(d) {
   else s.meses[d.rut] = Object.assign(local, { enviado: null, revisado: false, ingresado: false, nota: m.nota || local.nota || null });
   guardar();
 }
-async function cargarAdmin() {
-  const r = await api('adm-datos');
+async function cargarAdmin(listo) {
+  const r = listo || await api('adm-datos');
   if (r.error) { if (sesion) toast(r.error); return false; }
   s.remutyme = {}; s.cuentas = {}; s.meses = {};
   r.empresas.forEach(e => {
@@ -334,7 +334,7 @@ async function cargarAdmin() {
 /* Acción de administrador en el servidor; después vuelve a leer todo para quedar igual que el servidor. */
 function remoto(accion, datos) {
   if (!REMOTO) return;
-  api(accion, datos).then(r => { if (r.error) toast(r.error); return cargarAdmin(); }).then(() => { if (sesion) pintar(); });
+  api(accion, Object.assign({ conDatos: true }, datos)).then(r => { if (r.error) toast(r.error); return cargarAdmin(r.datosAdm); }).then(() => { if (sesion) pintar(); });
 }
 const LS = 'novedades-contyme-v5';
 const SS = 'novedades-contyme-sesion-v5';
@@ -1339,10 +1339,10 @@ const SUB = {
     const cod = String(val('a-codigo')).replace(/\D/g, '');
     if (cod.length !== 6) return falla('a-codigo', 'El código tiene 6 números.');
     ui.cargando = true; pintar();
-    const r = await api('admin-entrar', { correo: ui.adminCorreo, codigo: cod }); ui.cargando = false;
+    const r = await api('admin-entrar', { correo: ui.adminCorreo, codigo: cod, conDatos: true }); ui.cargando = false;
     if (!r.ok) { ui.err = { campo: r.campo || null, msg: r.error }; ui.foco = 'a-codigo'; pintar(); return; }
     sesion = { rol: 'admin', correo: r.correo, token: r.token, ultimo: Date.now() }; guardarSesion();
-    await cargarAdmin();
+    await cargarAdmin(r.datosAdm);
     entrar(sesion, 'Hola, ' + r.correo.split('@')[0]);
   },
   'f-admin': async () => {

@@ -52,9 +52,15 @@ function instalar() {
 function doPost(e) {
   var r;
   try {
+    _mem = {};
     var q = JSON.parse(e.postData.contents);
     var f = ACCIONES[q.accion];
     r = f ? f(q) : { error: 'Acción no válida.' };
+    // La app pide los datos de administración en la misma respuesta (una ida y vuelta menos).
+    if (q.conDatos && r && !r.error && (r.token || /^adm-/.test(q.accion)) && q.accion !== 'adm-datos') {
+      var d = ACCIONES['adm-datos'](r.token ? { token: r.token, periodo: q.periodo } : q);
+      if (d && d.ok) r.datosAdm = d;
+    }
   } catch (err) {
     console.error(err && err.stack || err);
     r = { error: 'Hubo un problema en el servidor de Contyme. Intenta de nuevo en unos minutos.' };
@@ -68,16 +74,36 @@ function doGet() {
 
 /* ---------- Utilidades ---------- */
 
-function prop(k) { return PropertiesService.getScriptProperties().getProperty(k) || ''; }
-function libro() { return SpreadsheetApp.openById(prop('SHEET_ID')); }
-function hoja(n) { return libro().getSheetByName(n); }
+/* Velocidad: _mem guarda lo leído durante una consulta; las hojas además quedan en CacheService (rápido) con una
+ * versión que cambia en cada escritura, así nunca se lee una copia vieja. */
+var _mem = {};
+function prop(k) { if (!_mem.p) _mem.p = PropertiesService.getScriptProperties().getProperties(); return _mem.p[k] || ''; }
+function libro() { return _mem.libro || (_mem.libro = SpreadsheetApp.openById(prop('SHEET_ID'))); }
+function hoja(n) { _mem.h = _mem.h || {}; return _mem.h[n] || (_mem.h[n] = libro().getSheetByName(n)); }
+function valores(n) {
+  _mem.v = _mem.v || {};
+  if (_mem.v[n]) return _mem.v[n];
+  var c = cache(), ver = c.get('ver:' + n);
+  if (!ver) { ver = String(Date.now()) + Math.random().toString(36).slice(2, 6); c.put('ver:' + n, ver, 21600); }
+  var guardado = c.get('hoja:' + n + ':' + ver), v = null;
+  if (guardado) { try { v = JSON.parse(guardado); } catch (e) { v = null; } }
+  if (!v) {
+    v = hoja(n).getDataRange().getValues().map(function (fila) { return fila.map(function (x) { return x instanceof Date ? x.toISOString() : x; }); });
+    var j = JSON.stringify(v); if (j.length < 95000) { try { c.put('hoja:' + n + ':' + ver, j, 21600); } catch (e) {} }
+  }
+  return (_mem.v[n] = v);
+}
+function cambio(n) { // después de escribir: nueva versión (la copia anterior queda descartada)
+  if (_mem.v) delete _mem.v[n];
+  cache().put('ver:' + n, String(Date.now()) + Math.random().toString(36).slice(2, 6), 21600);
+}
 function filas(n) {
-  var v = hoja(n).getDataRange().getValues(), cab = HOJAS[n], out = [];
+  var v = valores(n), cab = HOJAS[n], out = [];
   for (var i = 1; i < v.length; i++) { var o = { _fila: i + 1 }; cab.forEach(function (c, j) { o[c] = v[i][j]; }); out.push(o); }
   return out;
 }
-function escribir(n, o) { hoja(n).getRange(o._fila, 1, 1, HOJAS[n].length).setValues([HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })]); }
-function agregar(n, o) { hoja(n).appendRow(HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })); }
+function escribir(n, o) { hoja(n).getRange(o._fila, 1, 1, HOJAS[n].length).setValues([HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })]); cambio(n); }
+function agregar(n, o) { hoja(n).appendRow(HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })); cambio(n); }
 function ahora() { return new Date().toISOString(); }
 function hex(bytes) { return bytes.map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join(''); }
 function sha(t) { return hex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, t, Utilities.Charset.UTF_8)); }
@@ -296,7 +322,7 @@ var ACCIONES = {
         urls[f.idx] = { nombre: nombre, url: arch.getUrl() };
       });
       // Si fue reabierto, se reemplazan las novedades anteriores
-      if (previo) { var h = hoja('Novedades'), fl = filas('Novedades').filter(function (x) { return x.envioId === id; }).map(function (x) { return x._fila; }).sort(function (a, b) { return b - a; }); fl.forEach(function (f) { h.deleteRow(f); }); }
+      if (previo) { var h = hoja('Novedades'), fl = filas('Novedades').filter(function (x) { return x.envioId === id; }).map(function (x) { return x._fila; }).sort(function (a, b) { return b - a; }); fl.forEach(function (f) { h.deleteRow(f); }); cambio('Novedades'); }
       var conocidos = trabajadoresDe(s.rut), lineas = [];
       lista.forEach(function (n, i) {
         var trab = String(n.trabajador || '').slice(0, 120), adj = urls[i] || null;

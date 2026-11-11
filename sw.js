@@ -1,9 +1,9 @@
-/* Service worker de «Novedades Contyme».
- * - Guarda la app (página, manifiesto, íconos) al instalarse: abre sin internet.
- * - Página: primero la red (para tomar la versión nueva), si no hay red la guardada.
+﻿/* Service worker de Â«Novedades ContymeÂ».
+ * - Guarda la app (pÃ¡gina, manifiesto, Ã­conos) al instalarse: abre sin internet.
+ * - PÃ¡gina: primero la red (para tomar la versiÃ³n nueva), si no hay red la guardada.
  * - Las fuentes vienen dentro de la app (carpeta fuentes/).
- * Al cambiar algo de la app, subir VERSION para que los teléfonos tomen la nueva. */
-const VERSION = 'novedades-v7';
+ * Al cambiar algo de la app, subir VERSION para que los telÃ©fonos tomen la nueva. */
+const VERSION = 'novedades-v8';
 const APP = [
   './',
   'index.html',
