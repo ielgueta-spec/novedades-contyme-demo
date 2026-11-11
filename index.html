@@ -92,6 +92,7 @@ p { margin: 0; }
 .estado { background: rgba(255,255,255,.12); border-radius: 12px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
 .plazo-urgente { background: #FFE7B3; color: #4A3200 !important; border-radius: 8px; padding: 6px 10px; font-weight: 700; }
 .hist { margin-top: 24px; }
+.resp { margin-top: 4px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); }
 .hist-lista { list-style: none; padding: 0; margin: 10px 0 0; border-left: 2px solid var(--line); margin-left: 7px; }
 .hist-item { position: relative; display: flex; gap: 12px; padding: 0 0 16px 16px; }
 .hist-punto { position: absolute; left: -8px; top: 5px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 3px solid var(--line-fuerte); }
@@ -276,7 +277,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 19; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 20; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -992,6 +993,10 @@ const EVENTOS = {
   ingresada: ['Contyme ingresó tus novedades', 'Marcada ingresada'], listas: ['Tus liquidaciones están listas', 'Liquidaciones listas'],
   reabierto: ['Contyme te pidió revisar algo', 'Pidió corrección'], 'por-revisar': ['Contyme volvió a revisar tu envío', 'Volvió a «Por revisar»']
 };
+function tituloEvento(x, quien) {
+  if (x.evento === 'respuesta') return x.de === quien ? 'Respondiste' : x.de === 'contyme' ? 'Contyme te respondió' : 'La empresa respondió';
+  return (EVENTOS[x.evento] || [x.evento, x.evento])[quien === 'cliente' ? 0 : 1];
+}
 function noLeidos(rut) {
   let visto = ''; try { visto = localStorage.getItem('novedades-leido-' + rut) || ''; } catch (e) {}
   return ((s.historial || {})[rut] || []).filter(x => x.de === 'contyme' && String(x.t) > visto).length;
@@ -1003,7 +1008,7 @@ function marcarLeidos(rut) {
 function avisoMensajes(rut) {
   const n = noLeidos(rut); if (!n) return '';
   const u = ((s.historial || {})[rut] || []).filter(x => x.de === 'contyme').slice(-1)[0];
-  return '<div class="nota nota-info" role="status"><strong>' + esc((EVENTOS[u.evento] || ['Contyme actualizó tu envío'])[0]) + '</strong>' +
+  return '<div class="nota nota-info" role="status"><strong>' + esc(tituloEvento(u, 'cliente')) + '</strong>' +
     (u.texto ? '<span>«' + esc(u.texto) + '»</span>' : '') + '<a href="#historial">Ver el historial ↓</a></div>';
 }
 function historialHtml(rut, quien) {
@@ -1012,9 +1017,17 @@ function historialHtml(rut, quien) {
   if (quien === 'cliente') setTimeout(() => marcarLeidos(rut), 0);
   return '<div class="hist" id="historial"><h2 style="font-size:19px">' + (quien === 'cliente' ? 'Historial de tu envío' : 'Historial del envío') + '</h2><ol class="hist-lista">' +
     h.map(x => '<li class="hist-item ' + (x.de === 'contyme' ? 'de-contyme' : 'de-cliente') + '"><span class="hist-punto" aria-hidden="true"></span><div>' +
-      '<strong>' + esc((EVENTOS[x.evento] || [x.evento, x.evento])[k]) + '</strong>' + (x.resumen ? ' <span class="sub">· ' + esc(x.resumen) + '</span>' : '') +
+      '<strong>' + esc(tituloEvento(x, quien)) + '</strong>' + (x.resumen ? ' <span class="sub">· ' + esc(x.resumen) + '</span>' : '') +
       '<span class="sub hist-fecha">' + esc(fmtHora(x.t)) + (quien === 'contyme' && x.autor ? ' · ' + esc(String(x.autor).split('@')[0]) : '') + '</span>' +
-      (x.texto ? '<div class="hist-texto">«' + esc(x.texto) + '»</div>' : '') + '</div></li>').join('') + '</ol></div>';
+      (x.texto ? '<div class="hist-texto">«' + esc(x.texto) + '»</div>' : '') + '</div></li>').join('') + '</ol>' + cajaRespuesta(h, quien) + '</div>';
+}
+/* Se puede responder solo cuando el último mensaje es del otro lado (no es un chat libre). */
+function cajaRespuesta(h, quien) {
+  const u = h.filter(x => x.texto).slice(-1)[0]; if (!u || u.de === quien) return '';
+  const id = quien === 'cliente' ? 'resp-cli' : 'resp-adm';
+  return '<form id="f-' + id + '" novalidate class="resp"><div class="campo"><label for="' + id + '">' + (quien === 'cliente' ? 'Responder a Contyme' : 'Responder a la empresa') + '</label>' +
+    '<textarea id="' + id + '" rows="2" maxlength="1000"' + aria(id) + '>' + esc(val(id)) + '</textarea>' + pieCampo(id) + '</div>' +
+    '<button type="submit" class="btn btn-sec"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Enviando…' : 'Enviar respuesta') + '</button></form>';
 }
 function listaTrabajadores(d) {
   const lista = (d.trabajadores || []).slice().sort((a, b) => a.localeCompare(b, 'es'));
@@ -1671,6 +1684,22 @@ const SUB = {
     const editado = ui.editando != null;
     ir('mes');
     toast(repetida ? 'Guardada. Ojo: ' + trabajador + ' ya tenía otra novedad de ese tipo; revisa que no esté repetida.' : editado ? 'Cambios guardados' : 'Novedad guardada. Falta enviar a Contyme.');
+  },
+  'f-resp-cli': async () => {
+    if (ui.cargando) return;
+    const txt = String(val('resp-cli')).trim(); if (txt.length < 2) return falla('resp-cli', 'Escribe tu respuesta.');
+    ui.cargando = true; pintar();
+    const r = await api('cli-responder', { texto: txt }); ui.cargando = false;
+    if (!r.ok) return falla(r.campo || null, r.error);
+    s.historial[sesion.rut] = r.historial; ui.form['resp-cli'] = ''; guardar(); ui.foco = 'historial'; pintar(); toast('Respuesta enviada a Contyme');
+  },
+  'f-resp-adm': async () => {
+    if (ui.cargando || !ui.sel) return;
+    const txt = String(val('resp-adm')).trim(); if (txt.length < 2) return falla('resp-adm', 'Escribe la respuesta.');
+    ui.cargando = true; pintar();
+    const r = await api('adm-responder', { rut: ui.sel, texto: txt }); ui.cargando = false;
+    if (!r.ok) return falla(r.campo || null, r.error);
+    s.historial[ui.sel] = r.historial; ui.form['resp-adm'] = ''; guardar(); ui.foco = 'det-titulo'; pintar(); toast('Respuesta enviada: la ve en la app y le llega por correo');
   },
   'f-trab': () => {
     const texto = val('masiva-trab');

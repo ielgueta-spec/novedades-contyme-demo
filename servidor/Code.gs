@@ -102,6 +102,7 @@ function historialDe(rut, periodo, conAutor) {
   return filas('Historial').filter(function (x) { return x.rut === rut && x.periodo === periodo; })
     .map(function (x) { return { t: x.fecha, evento: x.evento, resumen: String(x.resumen || ''), de: x.de, autor: conAutor ? x.autor : (x.de === 'contyme' ? 'Contyme' : ''), texto: String(x.texto || '') }; });
 }
+function ultimoConTexto(rut, periodo) { var h = historialDe(rut, periodo, true).filter(function (x) { return x.texto; }); return h.length ? h[h.length - 1] : null; }
 function anotar(rut, periodo, evento, resumen, de, autor, texto) {
   agregar('Historial', { fecha: ahora(), periodo: periodo, rut: rut, evento: evento, resumen: resumen || '', de: de, autor: autor || '', texto: String(texto || '').trim().slice(0, 1000) });
 }
@@ -607,6 +608,33 @@ var ACCIONES = {
       Object.keys(porEmpresa).forEach(function (r) { registrar(r, 'accion', empresas[r] + ': ' + porEmpresa[r] + ' trabajadores cargados por ' + s.correo + '.'); });
     });
     return { ok: true, nuevos: nuevos, actualizados: actualizados, malos: malos };
+  },
+
+  /* Respuestas dentro del historial: el cliente responde una nota de Contyme y Contyme responde un mensaje del cliente.
+     No es un chat libre: solo se puede responder cuando el último mensaje es del otro lado. */
+  'cli-responder': function (q) {
+    var s = sesionDe(q, 'cliente'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
+    var per = periodoOk(q.periodo) ? q.periodo : periodoActual(), txt = String(q.texto || '').trim().slice(0, 1000);
+    if (txt.length < 2) return { campo: 'resp-cli', error: 'Escribe tu respuesta.' };
+    var e = empresa(s.rut); if (!e) return { error: 'Empresa no encontrada.', salir: true };
+    var u = conCandado(function () { var u = ultimoConTexto(s.rut, per); if (u && u.de === 'contyme') anotar(s.rut, per, 'respuesta', '', 'cliente', e.contacto || '', txt); return u; });
+    if (!u || u.de !== 'contyme') return { error: 'Puedes responder cuando Contyme te deje una nota.' };
+    var para = deContyme(e.correoEncargada) ? e.correoEncargada : admins().join(',');
+    correo(para, 'Respuesta de ' + e.nombre + ' (novedades ' + nombreMes(per) + ')', { titulo: e.nombre + ' respondió tu nota',
+      filas: [['Empresa', e.nombre], ['Período', nombreMes(per)]], intro: 'Tu nota: «' + u.texto + '»', nota: txt, boton: { txt: 'Responder en la app', url: APP_URL } });
+    registrar(s.rut, 'correo', e.nombre + ' respondió una nota; aviso a ' + para + '.');
+    return { ok: true, historial: historialDe(s.rut, per, false) };
+  },
+  'adm-responder': function (q) {
+    var s = sesionDe(q, 'admin'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
+    var e = empresa(normRut(q.rut)); if (!e || !periodoOk(q.periodo)) return { error: 'Empresa no encontrada.' };
+    var txt = String(q.texto || '').trim().slice(0, 1000); if (txt.length < 2) return { campo: 'resp-adm', error: 'Escribe la respuesta.' };
+    var u = conCandado(function () { var u = ultimoConTexto(e.rut, q.periodo); if (u && u.de === 'cliente') anotar(e.rut, q.periodo, 'respuesta', '', 'contyme', s.correo, txt); return u; });
+    if (!u || u.de !== 'cliente') return { error: 'Puedes responder cuando la empresa deje un mensaje.' };
+    var ok = correo(e.contacto, 'Contyme te respondió · ' + e.nombre, { titulo: 'Contyme te respondió', intro: 'Tu mensaje: «' + u.texto + '»', nota: txt,
+      boton: { txt: 'Ver el historial en la app', url: APP_URL }, responderA: deContyme(e.correoEncargada) ? e.correoEncargada : '' });
+    registrar(e.rut, 'correo', 'Respuesta de ' + s.correo + ' a ' + e.nombre + (ok ? '' : ' (sin correo de contacto: solo en la app)') + '.');
+    return { ok: true, historial: historialDe(e.rut, q.periodo, true) };
   },
 
   'adm-bloqueo': function (q) { return conEmpresaAdm(q, function (e, s) { e.habilitada = !!q.habilitada; registrar(e.rut, 'seguridad', e.nombre + ': acceso ' + (e.habilitada ? 'habilitado' : 'bloqueado') + ' por ' + s.correo + '.'); }); },

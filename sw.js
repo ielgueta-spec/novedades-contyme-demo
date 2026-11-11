@@ -3,7 +3,7 @@
  * - Página: primero la red, sin caché del navegador (para tomar siempre la versión nueva); sin red, la guardada.
  * - Cada mejora: subir VERSION aquí y VERSION_APP en index.html (mismo número). Los teléfonos instalados la detectan
  *   al abrir la app o al volver a ella, y se recargan solos cuando la persona no está a mitad de algo. */
-const VERSION = 'novedades-v19';
+const VERSION = 'novedades-v20';
 const APP = [
   './',
   'index.html',
