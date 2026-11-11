@@ -384,6 +384,11 @@ function dvValido(r) {
   const dv = 11 - (suma % 11); return (dv === 11 ? '0' : dv === 10 ? 'K' : String(dv)) === p[1];
 }
 const RE_CORREO = /^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/;
+function encLinea(r, k) {
+  const c = (k.datos[r] && k.datos[r].correoRrhh) || (s.remutyme[r] && s.remutyme[r].correoRrhh) || '';
+  if (!c) return '<div class="sub">Sin encargada: los avisos irán a los administradores.</div>';
+  return '<div class="sub">Encargada: ' + esc(c) + (/@contyme\.cl$/.test(c) ? '' : ' · <b>no es @contyme.cl</b>: por seguridad los avisos irán a los administradores.') + '</div>';
+}
 function dLocal(iso) { const [y, m, d] = String(iso).slice(0, 10).split('-').map(Number); return new Date(y, m - 1, d); }
 const fmtDia = d => d.toLocaleDateString('es-CL', { weekday: 'long', day: 'numeric', month: 'long' });
 const fmtCorta = iso => dLocal(iso).toLocaleDateString('es-CL', { day: 'numeric', month: 'short' }).replace('.', '');
@@ -634,7 +639,7 @@ const srv = {
     },
     analizarCarga(texto) {
       soyAdmin();
-      const r = { nuevas: [], ya: [], malos: [] }, vistos = new Set();
+      const r = { nuevas: [], cambios: [], ya: [], malos: [], datos: {} }, vistos = new Set();
       String(texto).split(/\r?\n/).forEach((linea, i) => {
         if (!linea.trim()) return;
         const celdas = linea.split(/[;,\t]/).map(x => x.trim().replace(/^"|"$/g, ''));
@@ -647,20 +652,22 @@ const srv = {
           const nombre = celdas.find(x => x && x !== celda && /[a-záéíóúñ]/i.test(x) && !RE_CORREO.test(x));
           const correoRrhh = (celdas.find(x => RE_CORREO.test(x)) || '').toLowerCase();
           if (!nombre) { r.malos.push('Línea ' + (i + 1) + ': ' + rutBonito(rut) + ' es nueva y falta el nombre de la empresa (RUT; nombre).'); return; }
-          r.datos = r.datos || {}; r.datos[rut] = { nombre: nombre.slice(0, 120), correoRrhh };
+          r.datos[rut] = { nombre: nombre.slice(0, 120), correoRrhh };
           r.nuevas.push(rut); return;
         }
-        const c = s.cuentas[rut];
-        if (c && c.habilitada) r.ya.push(rut); else r.nuevas.push(rut);
+        const c = s.cuentas[rut], correo = (celdas.find(x => RE_CORREO.test(x)) || '').toLowerCase();
+        if (correo && correo !== (s.remutyme[rut].correoRrhh || '').toLowerCase()) r.datos[rut] = { nombre: s.remutyme[rut].nombre, correoRrhh: correo };
+        if (c && c.habilitada) { if (r.datos[rut]) r.cambios.push(rut); else r.ya.push(rut); } else r.nuevas.push(rut);
       });
       return r;
     },
     aplicarCarga(ruts, datos) {
       soyAdmin(); let n = 0;
-      remoto('adm-habilitar', { empresas: ruts.map(rut => s.remutyme[rut] ? { rut, nombre: s.remutyme[rut].nombre } : { rut, nombre: datos[rut].nombre, correo: datos[rut].correoRrhh }) });
+      remoto('adm-habilitar', { empresas: ruts.map(rut => s.remutyme[rut] ? { rut, nombre: s.remutyme[rut].nombre, correo: datos && datos[rut] ? datos[rut].correoRrhh : '' } : { rut, nombre: datos[rut].nombre, correo: datos[rut].correoRrhh }) });
       ruts.forEach(rut => {
         if (!s.remutyme[rut] && datos && datos[rut]) s.remutyme[rut] = { nombre: datos[rut].nombre, cartera: 'Sin cartera', correoRrhh: datos[rut].correoRrhh, trabajadores: [] };
         if (!s.remutyme[rut]) return;
+        if (datos && datos[rut] && datos[rut].correoRrhh) { s.remutyme[rut].correoRrhh = datos[rut].correoRrhh; s.remutyme[rut].cartera = datos[rut].correoRrhh; }
         if (s.cuentas[rut]) s.cuentas[rut].habilitada = true; else s.cuentas[rut] = cuentaNueva();
         if (!s.meses[rut]) s.meses[rut] = { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null };
         registrar(rut, 'seguridad', s.remutyme[rut].nombre + ': habilitada en la app (carga masiva).');
@@ -969,15 +976,16 @@ function admEmpresas() {
       '<td data-l="Correo de contacto">' + (c.correo ? esc(c.correo) : '<span class="sub">—</span>') + '</td><td data-l="Acciones"><div class="acciones" style="gap:6px">' + acc.join('') + '</div></td></tr>';
   }).join('');
   let res = '';
-  if (ui.carga && ui.carga.listo != null) res = '<div class="resultado" role="status"><b>' + plural(ui.carga.listo, 'empresa habilitada', 'empresas habilitadas') + '.</b>' + (lnk && ui.carga.listo ? '<span>A cada una le llegó su link para crear la clave (simulado).</span>' : '') + '</div>';
+  if (ui.carga && ui.carga.listo != null) res = '<div class="resultado" role="status"><b>' + plural(ui.carga.listo, 'empresa lista', 'empresas listas') + '.</b>' + (lnk && ui.carga.listo ? '<span>A cada una le llegó su link para crear la clave (simulado).</span>' : '') + '</div>';
   else if (ui.carga) {
     const k = ui.carga;
     res = '<div class="resultado" role="status"><b>Revisión de la lista</b>' +
-      (k.nuevas.length ? '<div>' + (k.nuevas.length === 1 ? 'Se habilitará 1 empresa' : 'Se habilitarán ' + k.nuevas.length + ' empresas') + ':<ul>' + k.nuevas.map(r => '<li>' + esc(s.remutyme[r] ? s.remutyme[r].nombre : k.datos[r].nombre + ' (nueva)') + ' <span class="mono">(' + rutBonito(r) + ')</span></li>').join('') + '</ul></div>' : '<div>No hay empresas nuevas para habilitar.</div>') +
+      (k.nuevas.length ? '<div>' + (k.nuevas.length === 1 ? 'Se habilitará 1 empresa' : 'Se habilitarán ' + k.nuevas.length + ' empresas') + ':<ul>' + k.nuevas.map(r => '<li>' + esc(s.remutyme[r] ? s.remutyme[r].nombre : k.datos[r].nombre + ' (nueva)') + ' <span class="mono">(' + rutBonito(r) + ')</span>' + encLinea(r, k) + '</li>').join('') + '</ul></div>' : (k.cambios.length ? '' : '<div>No hay empresas nuevas para habilitar.</div>')) +
+      (k.cambios.length ? '<div>' + (k.cambios.length === 1 ? 'Se cambiará la encargada de 1 empresa' : 'Se cambiará la encargada de ' + k.cambios.length + ' empresas') + ':<ul>' + k.cambios.map(r => '<li>' + esc(s.remutyme[r].nombre) + ' <span class="mono">(' + rutBonito(r) + ')</span>' + encLinea(r, k) + '</li>').join('') + '</ul></div>' : '') +
       (k.repetidos ? '<div class="sub">' + plural(k.repetidos, 'RUT repetido en la lista (se cuenta una vez)', 'RUT repetidos en la lista (se cuentan una vez)') + '.</div>' : '') +
       (k.ya.length ? '<div class="sub">' + plural(k.ya.length, 'ya estaba habilitada', 'ya estaban habilitadas') + '.</div>' : '') +
       (k.malos.length ? '<div class="malos">Con problemas (no se habilitan):<ul>' + k.malos.map(x => '<li>' + esc(x) + '</li>').join('') + '</ul></div>' : '') +
-      (k.nuevas.length ? '<button type="button" class="btn btn-pri" data-a="aplicar-carga">Habilitar ' + plural(k.nuevas.length, 'empresa', 'empresas') + '</button>' : '') +
+      (k.nuevas.length + k.cambios.length ? '<button type="button" class="btn btn-pri" data-a="aplicar-carga">' + (k.nuevas.length ? 'Habilitar ' + plural(k.nuevas.length, 'empresa', 'empresas') + (k.cambios.length ? ' y cambiar ' + k.cambios.length + ' encargada' + (k.cambios.length > 1 ? 's' : '') : '') : 'Cambiar ' + plural(k.cambios.length, 'encargada', 'encargadas')) + '</button>' : '') +
       '<button type="button" class="btn-link" data-a="cancelar-carga">Cancelar</button></div>';
   }
   const sinActivar = ruts.filter(r => !s.cuentas[r].hash && s.cuentas[r].habilitada).length, piden = ruts.filter(r => s.cuentas[r].pideReset).length;
@@ -1231,7 +1239,7 @@ const ACC = {
     dialogo({ titulo: '¿Bloquear el acceso de ' + nom + '?', ok: 'Bloquear', peligro: true, html: '<p>No podrá entrar a la app hasta que la vuelvas a habilitar. Sus datos se mantienen.</p>',
       accion: () => { srv.adm.alternarBloqueo(v); pintar(); toast(nom + ': acceso bloqueado'); } });
   },
-  'aplicar-carga': () => { const n = srv.adm.aplicarCarga(ui.carga.nuevas, ui.carga.datos); ui.carga = { listo: n }; ui.form.masiva = ''; pintar(); toast(plural(n, 'empresa habilitada', 'empresas habilitadas')); },
+  'aplicar-carga': () => { const n = srv.adm.aplicarCarga(ui.carga.nuevas.concat(ui.carga.cambios || []), ui.carga.datos); ui.carga = { listo: n }; ui.form.masiva = ''; pintar(); toast(plural(n, 'empresa lista', 'empresas listas')); },
   'cancelar-carga': () => { ui.carga = null; ui.foco = 'masiva'; pintar(); },
   'act-filtro': v => { ui.actFiltro = v; pintar(); },
   activacion: v => { srv.adm.cambiarActivacion(v); pintar(); toast('Modo de la demo: ' + (v === 'link' ? 'link de un solo uso' : 'clave inicial')); },
