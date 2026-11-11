@@ -12,7 +12,7 @@
  *   (SHEET_ID y CARPETA_ID los completa instalar())
  */
 
-var APP_URL = 'https://ielgueta-spec.github.io/novedades-contyme-demo/'; // link de los botones de los correos
+var APP_URL = 'https://ielgueta-spec.github.io/novedades-remuneraciones/'; // link de los botones de los correos
 var DOMINIO_ENCARGADAS = 'contyme.cl';   // los avisos de envíos solo van a correos de este dominio
 var MAX_INTENTOS = 5;
 var ITERACIONES = 2000;                   // vueltas del hash de las claves
