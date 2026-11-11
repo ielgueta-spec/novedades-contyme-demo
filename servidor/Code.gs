@@ -52,7 +52,7 @@ function instalar() {
 function doPost(e) {
   var r;
   try {
-    _mem = {};
+    _mem = {}; var t0 = Date.now();
     var q = JSON.parse(e.postData.contents);
     var f = ACCIONES[q.accion];
     r = f ? f(q) : { error: 'Acción no válida.' };
@@ -61,6 +61,7 @@ function doPost(e) {
       var d = ACCIONES['adm-datos'](r.token ? { token: r.token, periodo: q.periodo } : q);
       if (d && d.ok) r.datosAdm = d;
     }
+    if (r) r._ms = Date.now() - t0;
   } catch (err) {
     console.error(err && err.stack || err);
     r = { error: 'Hubo un problema en el servidor de Contyme. Intenta de nuevo en unos minutos.' };
@@ -108,6 +109,12 @@ function ahora() { return new Date().toISOString(); }
 function hex(bytes) { return bytes.map(function (b) { return ('0' + (b & 255).toString(16)).slice(-2); }).join(''); }
 function sha(t) { return hex(Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, t, Utilities.Charset.UTF_8)); }
 function azar() { return sha(Utilities.getUuid() + Utilities.getUuid() + Date.now()).slice(0, 40); }
+function esPre(p) { return /^[0-9a-f]{64}$/.test(String(p || '')); }
+function huellaV2(pre, sal) { return sha(sal + '|' + pre); }
+function claveCorrecta(e, q) {
+  if (String(e.sal).indexOf('v2:') === 0) return esPre(q.pre) && huellaV2(q.pre, e.sal) === e.hash;
+  return huella(String(q.clave || ''), e.sal) === e.hash; // clave antigua: se pasa a v2 al entrar
+}
 function huella(clave, sal) { var h = sal + '|' + clave; for (var i = 0; i < ITERACIONES; i++) h = sha(sal + h); return h; }
 function normRut(t) {
   var x = String(t || '').replace(/[^0-9kK]/g, '').toUpperCase().replace(/^0+/, '');
@@ -244,14 +251,16 @@ var ACCIONES = {
       if (!e) { Utilities.sleep(300); return { campo: 'clave', error: GENERICO }; }
       if (!siNo(e.habilitada)) return { error: 'El acceso de esta empresa está bloqueado. Habla con tu encargada de remuneraciones en Contyme.' };
       if (Number(e.intentos) >= MAX_INTENTOS) return { error: BLOQUEO };
-      var ok = e.hash ? huella(clave, e.sal) === e.hash : (prop('CLAVE_INICIAL') !== '' && clave === prop('CLAVE_INICIAL'));
+      var ok = e.hash ? claveCorrecta(e, q) : (prop('CLAVE_INICIAL') !== '' && clave === prop('CLAVE_INICIAL'));
       if (!ok) {
         e.intentos = Number(e.intentos || 0) + 1; escribir('Empresas', e);
         if (e.intentos >= MAX_INTENTOS) { registrar(rut, 'seguridad', e.nombre + ': acceso bloqueado por ' + MAX_INTENTOS + ' intentos fallidos.'); return { error: BLOQUEO }; }
         var quedan = MAX_INTENTOS - e.intentos;
         return { campo: 'clave', error: GENERICO + (quedan <= 2 ? ' Te quedan ' + quedan + (quedan === 1 ? ' intento.' : ' intentos.') : '') };
       }
-      e.intentos = 0; escribir('Empresas', e);
+      var cambiar = Number(e.intentos || 0) !== 0;
+      if (e.hash && String(e.sal).indexOf('v2:') !== 0 && esPre(q.pre)) { e.sal = 'v2:' + azar(); e.hash = huellaV2(q.pre, e.sal); cambiar = true; }
+      if (cambiar) { e.intentos = 0; escribir('Empresas', e); }
       if (!e.hash) { var t = azar(); cache().put('k:' + t, rut, 600); return { paso: 'crear', ticket: t, nombre: e.nombre, rut: rut }; }
       return { ok: true, rut: rut, token: nuevaSesion({ rol: 'cliente', rut: rut }, HORAS_SESION_CLIENTE), datos: datosCliente(rut, q.periodo) };
     });
@@ -265,7 +274,8 @@ var ACCIONES = {
     if (!RE_CORREO.test(contacto)) return { campo: 'contacto', error: 'Escribe un correo de contacto válido, por ejemplo nombre@tuempresa.cl.' };
     return conCandado(function () {
       var e = empresa(rut); if (!e || !siNo(e.habilitada)) return { error: 'El acceso de esta empresa está bloqueado.', reiniciar: true };
-      e.sal = azar(); e.hash = huella(nueva, e.sal); e.contacto = contacto; e.intentos = 0; e.pideReset = false; e.actualizada = ahora();
+      if (esPre(q.pre)) { e.sal = 'v2:' + azar(); e.hash = huellaV2(q.pre, e.sal); } else { e.sal = azar(); e.hash = huella(nueva, e.sal); }
+      e.contacto = contacto; e.intentos = 0; e.pideReset = false; e.actualizada = ahora();
       escribir('Empresas', e); cache().remove('k:' + q.ticket);
       registrar(rut, 'seguridad', e.nombre + ' creó su clave.');
       return { ok: true, rut: rut, token: nuevaSesion({ rol: 'cliente', rut: rut }, HORAS_SESION_CLIENTE), datos: datosCliente(rut, q.periodo) };
@@ -310,10 +320,15 @@ var ACCIONES = {
       if (previo && previo.estado !== 'reabierto') return { error: 'Ya enviaste las novedades de ' + nombreMes(q.periodo) + '. Si te faltó algo, escríbele a tu encargada.' };
       var id = previo ? previo.id : azar().slice(0, 12);
       // Carpeta privada del envío: <raíz>/<período>/<RUT> <empresa>
-      var raiz = DriveApp.getFolderById(prop('CARPETA_ID'));
-      var fp = raiz.getFoldersByName(q.periodo), carPer = fp.hasNext() ? fp.next() : raiz.createFolder(q.periodo);
-      var nomCar = s.rut + ' ' + e.nombre, fe = carPer.getFoldersByName(nomCar), car = fe.hasNext() ? fe.next() : carPer.createFolder(nomCar);
-      if (deContyme(e.correoEncargada)) { try { car.addViewer(e.correoEncargada); } catch (err) {} }
+      var claveCar = 'car:' + q.periodo + '|' + s.rut + '|' + (e.correoEncargada || ''), idCar = PropertiesService.getScriptProperties().getProperty(claveCar), car = null;
+      if (idCar) { try { car = DriveApp.getFolderById(idCar); } catch (err) { car = null; } }
+      if (!car) {
+        var raiz = DriveApp.getFolderById(prop('CARPETA_ID'));
+        var fp = raiz.getFoldersByName(q.periodo), carPer = fp.hasNext() ? fp.next() : raiz.createFolder(q.periodo);
+        var nomCar = s.rut + ' ' + e.nombre, fe = carPer.getFoldersByName(nomCar); car = fe.hasNext() ? fe.next() : carPer.createFolder(nomCar);
+        if (deContyme(e.correoEncargada)) { try { car.addViewer(e.correoEncargada); } catch (err) {} }
+        PropertiesService.getScriptProperties().setProperty(claveCar, car.getId());
+      }
       var urls = {};
       archivos.forEach(function (f) {
         var mime = /^(image\/[a-z0-9.+-]+|application\/pdf)$/i.test(f.mime || '') ? f.mime : 'application/octet-stream';
