@@ -3,11 +3,12 @@
  * - PÃ¡gina: primero la red (para tomar la versiÃ³n nueva), si no hay red la guardada.
  * - Las fuentes vienen dentro de la app (carpeta fuentes/).
  * Al cambiar algo de la app, subir VERSION para que los telÃ©fonos tomen la nueva. */
-const VERSION = 'novedades-v11';
+const VERSION = 'novedades-v12';
 const APP = [
   './',
   'index.html',
   'manifest.webmanifest',
+  'iconos/logo-contyme-blanco-520.png',
   'iconos/icono-192.png',
   'iconos/icono-512.png',
   'iconos/icono-maskable-512.png',

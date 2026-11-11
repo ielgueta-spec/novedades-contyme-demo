@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Novedades Contyme</title>
+<title>Novedades Remuneraciones</title>
 <meta name="description" content="Las empresas envían a Contyme las novedades de sus trabajadores para las liquidaciones del mes.">
 <meta name="theme-color" content="#0F4C47">
 <meta name="robots" content="noindex, nofollow">
@@ -12,7 +12,7 @@
 <link rel="apple-touch-icon" href="iconos/apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-title" content="Novedades">
+<meta name="apple-mobile-web-app-title" content="Novedades Remu">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <link rel="stylesheet" href="fuentes/fuentes.css">
 <style>
@@ -23,7 +23,7 @@ img { max-width: 100%; }
 [hidden] { display: none !important; }
 </style>
 <style>
-/* Novedades Contyme · DEMO con datos ficticios.
+/* Novedades Remuneraciones (Contyme).
    Este archivo es público (GitHub): no contiene datos reales, claves reales, correos reales ni URLs internas. */
 :root {
   --bg: #F3F6F5; --card: #FFFFFF; --fg: #13201F; --muted: #52625F; --line: #D9E2E0; --line-fuerte: #9FB3AF;
@@ -181,6 +181,9 @@ legend { padding: 0; margin-bottom: 8px; display: flex; gap: 8px; align-items: c
 .adm-top-in { max-width: 1200px; margin: 0 auto; display: flex; flex-wrap: wrap; gap: 10px 12px; justify-content: space-between; align-items: center; }
 .adm-marca { display: flex; flex-direction: column; min-width: 0; }
 .adm-marca span:first-child { font-family: var(--display); font-weight: 700; font-size: 20px; }
+.logo-top { display: block; height: 26px; width: auto; margin-bottom: 4px; align-self: flex-start; object-fit: contain; }
+.logo-login { display: block; width: 190px; max-width: 70%; height: auto; margin-bottom: 6px; }
+.adm-marca .logo-top { height: 24px; margin: 0 0 2px; }
 .adm-marca span:last-child { font-size: 13px; color: var(--admin-sub); overflow-wrap: anywhere; }
 .adm-nav { display: flex; gap: 4px; flex-wrap: wrap; order: 3; width: 100%; }
 @media (min-width: 900px) { .adm-nav { order: 0; width: auto; } }
@@ -861,7 +864,7 @@ function vistaLogin() {
       '<button type="submit" class="btn btn-pri"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Entrando…' : 'Entrar') + '</button>' +
       '<button type="button" class="btn-link" data-a="paso" data-v="olvide">Olvidé mi clave</button>' + demo + '</form>';
   }
-  return '<div class="login"><header class="login-top gutter"><span class="eyebrow">Contyme · Remuneraciones</span><h1>Novedades</h1><p>Envía a Contyme lo que pasó con tus trabajadores este mes para hacer las liquidaciones.</p></header>' +
+  return '<div class="login"><header class="login-top gutter"><img class="logo-login" src="iconos/logo-contyme-blanco-520.png" alt="Contyme · Asesores, Auditores, Contables" width="190" height="54"><h1>Novedades Remuneraciones</h1><p>Envía a Contyme lo que pasó con tus trabajadores este mes para hacer las liquidaciones.</p></header>' +
     '<main id="principal">' + cuerpo + '</main>' +
     (ui.paso === 'rut' ? '<p class="pie-login"><button type="button" class="btn-link chico" data-a="paso" data-v="contyme">Acceso equipo Contyme</button></p>' : '') + '</div>';
 }
@@ -985,7 +988,7 @@ function vistaCliente() {
   const cuerpo = ui.tab === 'nueva' ? cliNueva(d) : ui.tab === 'historial' ? cliHistorial(d) : cliMes(d);
   const tab = (id, txt, svg, badge) => '<button type="button" data-a="tab" data-v="' + id + '"' + (ui.tab === id ? ' aria-current="page"' : '') + '>' + svg + txt +
     (badge ? '<span class="badge" aria-label="' + plural(badge, 'novedad sin enviar', 'novedades sin enviar') + '">' + badge + '</span>' : '') + '</button>';
-  return '<div class="app"><header class="top gutter"><div class="top-row"><div style="min-width:0"><div class="eyebrow">Contyme · Remuneraciones</div><div class="empresa">' + esc(d.nombre) + '</div></div>' +
+  return '<div class="app"><header class="top gutter"><div class="top-row"><div style="min-width:0"><img class="logo-top" src="iconos/logo-contyme-blanco-520.png" alt="Contyme" width="92" height="26"><div class="eyebrow">Novedades Remuneraciones</div><div class="empresa">' + esc(d.nombre) + '</div></div>' +
     '<button type="button" class="salir" data-a="salir">Salir</button></div>' +
     '<h1>Novedades de ' + esc(CONFIG.periodo.mes) + '</h1><p>Cuéntanos qué pasó con tus trabajadores este mes. Con esto hacemos las liquidaciones.</p>' +
     '<div class="estado"><span>' + esc(e[0]) + '</span><span class="pill ' + e[2] + '">' + e[1] + '</span></div>' +
@@ -1126,7 +1129,7 @@ function vistaAdmin() {
   const piden = srv.adm.empresas().filter(r => s.cuentas[r].pideReset).length;
   const nav = (id, txt, b) => '<button type="button" data-a="adm" data-v="' + id + '"' + (ui.admTab === id ? ' aria-current="page"' : '') + '>' + txt + (b ? '<span class="badge" aria-label="' + plural(b, 'pide', 'piden') + ' restablecer clave">' + b + '</span>' : '') + '</button>';
   const cuerpo = ui.admTab === 'empresas' ? admEmpresas() : ui.admTab === 'actividad' ? admActividad() : ui.admTab === 'ajustes' ? admAjustes() : admBandeja();
-  return '<header class="adm-top gutter"><div class="adm-top-in"><div class="adm-marca"><span>Contyme · Administración</span><span>' + esc(sesion.correo) + '</span></div>' +
+  return '<header class="adm-top gutter"><div class="adm-top-in"><div class="adm-marca"><img class="logo-top" src="iconos/logo-contyme-blanco-520.png" alt="Contyme" width="85" height="24"><span>Novedades Remuneraciones · Administración</span><span>' + esc(sesion.correo) + '</span></div>' +
     '<nav class="adm-nav" aria-label="Administración">' + nav('bandeja', 'Bandeja') + nav('empresas', 'Empresas', piden) + nav('actividad', 'Actividad') + nav('ajustes', 'Ajustes') + '</nav>' +
     (REMOTO ? '<button type="button" class="salir" data-a="actualizar">Actualizar</button>' : '') +
     '<button type="button" class="salir" data-a="salir">Salir</button></div></header>' +

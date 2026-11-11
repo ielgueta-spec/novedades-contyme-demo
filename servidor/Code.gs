@@ -1,5 +1,5 @@
 /**
- * Novedades Contyme · servidor en Google Apps Script.
+ * Novedades Remuneraciones (Contyme) · servidor en Google Apps Script.
  *
  * Recibe lo que manda la app (index.html), guarda empresas, claves (solo su huella), envíos y novedades en una Google
  * Sheet, sube los respaldos a una carpeta privada de Drive y manda los correos de aviso.
@@ -209,7 +209,7 @@ function correo(para, asunto, m) {
   var lista = String(para || '').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return RE_CORREO.test(x); });
   if (!lista.length) return false;
   if (typeof m === 'string') m = { intro: m };
-  var o = { to: lista.join(','), subject: asunto, name: 'Novedades Contyme', body: textoCorreo(m), htmlBody: htmlCorreo(m) };
+  var o = { to: lista.join(','), subject: asunto, name: 'Novedades Remuneraciones · Contyme', body: textoCorreo(m), htmlBody: htmlCorreo(m) };
   if (m.responderA && RE_CORREO.test(m.responderA)) o.replyTo = m.responderA;
   try { MailApp.sendEmail(o); return true; }
   catch (e) { console.error('Correo no enviado (' + asunto + '): ' + (e && e.message || e)); return false; } // los datos ya quedaron guardados
@@ -228,15 +228,15 @@ function textoCorreo(m) {
   if (m.nota) t.push(m.nota, '');
   if (m.boton) t.push(m.boton.txt + ': ' + m.boton.url);
   if (m.boton2) t.push(m.boton2.txt + ': ' + m.boton2.url);
-  t.push('', '—', 'Novedades Contyme · Asesores · Auditores · Contables', m.responderA ? 'Si respondes este correo, le llega a tu encargada en Contyme.' : 'Mensaje automático.');
+  t.push('', '—', 'Novedades Remuneraciones · Contyme · Asesores · Auditores · Contables', m.responderA ? 'Si respondes este correo, le llega a tu encargada en Contyme.' : 'Mensaje automático.');
   return t.join('\n');
 }
 function htmlCorreo(m) {
   var V = '#0E7C7B', OSC = '#0B3B3A', GRIS = '#5B6B6A', BORDE = '#DCE6E5';
   var x = '<div style="margin:0;padding:24px 12px;background:#F2F6F6;font-family:Arial,Helvetica,sans-serif;color:#1F2A2A">' +
     '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;background:#fff;border:1px solid ' + BORDE + ';border-radius:12px;overflow:hidden">' +
-    '<tr><td style="background:' + V + ';padding:18px 24px;color:#fff"><div style="font-size:20px;font-weight:bold;letter-spacing:1px">CONTYME</div>' +
-    '<div style="font-size:12px;opacity:.85">Novedades de remuneraciones</div></td></tr><tr><td style="padding:24px">';
+    '<tr><td style="background:' + V + ';padding:18px 24px;color:#fff"><img src="' + APP_URL + 'iconos/logo-contyme-blanco-520.png" width="170" alt="CONTYME" style="display:block;width:170px;height:auto;border:0;color:#fff;font-size:20px;font-weight:bold">' +
+    '<div style="font-size:13px;opacity:.9;margin-top:6px">Novedades Remuneraciones</div></td></tr><tr><td style="padding:24px">';
   if (m.titulo) x += '<h1 style="margin:0 0 12px;font-size:20px;color:' + OSC + '">' + hx(m.titulo) + '</h1>';
   if (m.intro) x += '<p style="margin:0 0 16px;font-size:15px;line-height:1.5">' + hx(m.intro).replace(/\n/g, '<br>') + '</p>';
   if (m.filas && m.filas.length) {
@@ -263,7 +263,7 @@ function htmlCorreo(m) {
       (i ? 'color:' + V + ';border:1px solid ' + V : 'background:' + V + ';color:#fff') + '">' + hx(b.txt) + '</a>';
   });
   x += '</td></tr><tr><td style="padding:14px 24px;background:#F7FAFA;border-top:1px solid ' + BORDE + ';font-size:12px;color:' + GRIS + '">CONTYME · Asesores · Auditores · Contables<br>' +
-    (m.responderA ? 'Si respondes este correo, le llega a tu encargada en Contyme.' : 'Mensaje automático de la app de Novedades.') + '</td></tr></table></div>';
+    (m.responderA ? 'Si respondes este correo, le llega a tu encargada en Contyme.' : 'Mensaje automático de Novedades Remuneraciones.') + '</td></tr></table></div>';
   return x;
 }
 function rutPuntos(r) { var p = String(r).split('-'); return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (p[1] ? '-' + p[1] : ''); }
@@ -490,7 +490,7 @@ var ACCIONES = {
     if (admins().indexOf(c) >= 0) {
       var cod = String(Math.floor(100000 + Math.random() * 900000));
       cache().put('c:' + c, JSON.stringify({ cod: cod, n: 0 }), 600);
-      correo(c, 'Tu código para entrar a Novedades Contyme: ' + cod, {
+      correo(c, 'Tu código para entrar a Novedades Remuneraciones: ' + cod, {
         titulo: 'Tu código es ' + cod,
         intro: 'Escríbelo en la app para entrar como administrador. Vence en 10 minutos.',
         nota: 'Si no lo pediste, ignora este correo: nadie puede entrar sin el código.' });

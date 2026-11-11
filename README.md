@@ -1,4 +1,4 @@
-# Novedades Contyme (versión piloto)
+# Novedades Remuneraciones · Contyme
 
 App web instalable (PWA) para que las **empresas clientes** envíen a Contyme las novedades de sus trabajadores del mes
 (horas extra, bonos, licencias con respaldo, vacaciones, ausencias, anticipos, ingresos, términos o «sin novedades»), y

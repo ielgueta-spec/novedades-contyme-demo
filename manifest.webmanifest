@@ -1,7 +1,7 @@
 {
-  "name": "Novedades Contyme",
-  "short_name": "Novedades",
-  "description": "Envía a Contyme las novedades de tus trabajadores para las liquidaciones del mes.",
+  "name": "Novedades Remuneraciones",
+  "short_name": "Novedades Remu",
+  "description": "Envía a Contyme las novedades de tus trabajadores para las liquidaciones de remuneraciones del mes.",
   "lang": "es-CL",
   "start_url": "./",
   "scope": "./",
