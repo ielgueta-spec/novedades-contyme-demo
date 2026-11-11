@@ -257,7 +257,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 14; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 15; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -1484,7 +1484,9 @@ const SUB = {
     const correo = String(val('a-correo')).trim().toLowerCase();
     if (!RE_CORREO.test(correo)) return falla('a-correo', 'Escribe tu correo de Contyme.');
     ui.cargando = true; pintar();
-    let ok = false; try { ok = await esAdmin(correo); } catch (e) { ok = false; }
+    /* Con servidor, quién es administrador lo decide solo la propiedad ADMINS del script (se agregan correos sin tocar la app).
+       La lista de abajo es solo para la versión sin servidor. */
+    let ok = REMOTO; if (!REMOTO) { try { ok = await esAdmin(correo); } catch (e) { ok = false; } }
     ui.cargando = false;
     if (!ok) { ui.err = { msg: 'Este correo no tiene acceso de administrador.' }; ui.foco = 'a-correo'; pintar(); return; }
     if (REMOTO) {
