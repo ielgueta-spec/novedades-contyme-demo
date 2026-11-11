@@ -115,14 +115,16 @@ function valores(n) {
  * guardan en trozos, así Novedades y Actividad siguen en caché aunque crezcan mes a mes (antes, pasados ~95.000
  * caracteres, se leían enteras desde la planilla en cada consulta). */
 var TROZO = 30000; // caracteres por trozo: la caché acepta 100 KB por valor y así cabe aunque haya tildes y ñ
+/* Las llaves del caché incluyen la planilla: si cambia SHEET_ID nunca se lee una copia de otra planilla. */
+function kv(n) { return 'ver:' + String(prop('SHEET_ID')).slice(0, 16) + ':' + n; }
 function precargar(nombres) {
   _mem.v = _mem.v || {};
   var faltan = nombres.filter(function (n) { return !_mem.v[n]; });
   if (!faltan.length) return;
-  var c = cache(), vers = c.getAll(faltan.map(function (n) { return 'ver:' + n; })) || {}, nuevas = {};
-  faltan.forEach(function (n) { if (!vers['ver:' + n]) nuevas['ver:' + n] = vers['ver:' + n] = String(Date.now()) + Math.random().toString(36).slice(2, 6); });
+  var c = cache(), vers = c.getAll(faltan.map(function (n) { return kv(n); })) || {}, nuevas = {};
+  faltan.forEach(function (n) { if (!vers[kv(n)]) nuevas[kv(n)] = vers[kv(n)] = String(Date.now()) + Math.random().toString(36).slice(2, 6); });
   if (Object.keys(nuevas).length) c.putAll(nuevas, 21600);
-  var clave = function (n) { return 'hoja:' + n + ':' + vers['ver:' + n]; };
+  var clave = function (n) { return 'hoja:' + n + ':' + vers[kv(n)]; };
   var cabezas = c.getAll(faltan.map(clave)) || {}, trozos = [];
   faltan.forEach(function (n) { var m = /^trozos:(\d+)$/.exec(cabezas[clave(n)] || ''); if (m) for (var i = 0; i < Number(m[1]); i++) trozos.push(clave(n) + ':' + i); });
   var partes = trozos.length ? (c.getAll(trozos) || {}) : {};
@@ -152,18 +154,27 @@ function guardarCache(k, v) {
 }
 function cambio(n) { // después de escribir: nueva versión (la copia anterior queda descartada)
   if (_mem.v) delete _mem.v[n];
-  cache().put('ver:' + n, String(Date.now()) + Math.random().toString(36).slice(2, 6), 21600);
+  cache().put(kv(n), String(Date.now()) + Math.random().toString(36).slice(2, 6), 21600);
+}
+/* Google Sheets convierte el texto «2026-11» en una fecha (1-nov-2026). Al leer, esas columnas vuelven a «AAAA-MM». */
+var COLS_PERIODO = { periodo: 1, baja: 1 };
+function comoPeriodo(v) {
+  if (v instanceof Date) return v.getFullYear() + '-' + dos(v.getMonth() + 1);
+  if (typeof v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(v)) { var d = new Date(v); return d.getFullYear() + '-' + dos(d.getMonth() + 1); }
+  return v === undefined || v === null ? '' : String(v);
 }
 function filas(n) {
   var v = valores(n), cab = HOJAS[n], out = [];
-  for (var i = 1; i < v.length; i++) { var o = { _fila: i + 1 }; cab.forEach(function (c, j) { o[c] = v[i][j]; }); out.push(o); }
+  for (var i = 1; i < v.length; i++) { var o = { _fila: i + 1 }; cab.forEach(function (c, j) { o[c] = COLS_PERIODO[c] ? comoPeriodo(v[i][j]) : v[i][j]; }); out.push(o); }
   return out;
 }
-function escribir(n, o) { hoja(n).getRange(o._fila, 1, 1, HOJAS[n].length).setValues([HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })]); cambio(n); }
-function agregar(n, o) { hoja(n).appendRow(HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })); cambio(n); }
+/* Al escribir: lo que parece fecha o fórmula se guarda como texto (apóstrofo), para que Sheets no lo transforme. */
+function aCelda(v) { v = v === undefined || v === null ? '' : v; return typeof v === 'string' && (/^[=+\-@]/.test(v) || /^\d{4}-\d{2}(-\d{2})?$/.test(v)) ? "'" + v : v; }
+function escribir(n, o) { hoja(n).getRange(o._fila, 1, 1, HOJAS[n].length).setValues([HOJAS[n].map(function (c) { return aCelda(o[c]); })]); cambio(n); }
+function agregar(n, o) { hoja(n).appendRow(HOJAS[n].map(function (c) { return aCelda(o[c]); })); cambio(n); }
 /* Varias filas en una sola escritura (antes, una llamada a la planilla por novedad). Solo dentro de conCandado. */
 function asegurarCabecera(n) {
-  var c = cache(), k = 'cab:' + n + ':' + HOJAS[n].length; if (c.get(k)) return;
+  var c = cache(), k = 'cab:' + String(prop('SHEET_ID')).slice(0, 16) + ':' + n + ':' + HOJAS[n].length; if (c.get(k)) return;
   try { // solo cosmético: nunca debe impedir un envío
     var h = hoja(n), v = h.getRange(1, 1, 1, HOJAS[n].length).getValues()[0];
     if (v.join('|') !== HOJAS[n].join('|')) h.getRange(1, 1, 1, HOJAS[n].length).setValues([HOJAS[n]]).setFontWeight('bold');
@@ -172,7 +183,7 @@ function asegurarCabecera(n) {
 }
 function agregarVarias(n, lista) {
   if (!lista.length) return;
-  var h = hoja(n), m = lista.map(function (o) { return HOJAS[n].map(function (c) { var v = o[c] === undefined ? '' : o[c]; return typeof v === 'string' && /^[=+\-@]/.test(v) ? "'" + v : v; }); }); // = + - @ al inicio: queda como texto, nunca como fórmula
+  var h = hoja(n), m = lista.map(function (o) { return HOJAS[n].map(function (c) { return aCelda(o[c]); }); }); // = + - @ al inicio: queda como texto, nunca como fórmula
   var desde = h.getLastRow() + 1, hasta = desde + m.length - 1;
   if (hasta > h.getMaxRows()) h.insertRowsAfter(h.getMaxRows(), hasta - h.getMaxRows() + 100); // appendRow agregaba filas solo
   h.getRange(desde, 1, m.length, HOJAS[n].length).setValues(m);

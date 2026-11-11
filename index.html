@@ -277,7 +277,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 20; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 21; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -291,7 +291,7 @@ const VERSION_APP = 20; // subir junto con VERSION de sw.js en cada mejora
 const CONFIG = {
   /* Dirección del servidor (Google Apps Script publicado como app web, ver servidor/INSTALAR.md).
      Vacío = todo queda en este dispositivo (modo local, sirve para probar sin servidor). */
-  servidor: 'https://script.google.com/macros/s/AKfycbyXxmqTPAHopFXfiNsSeh80tVQCAarUUCQB2NmhAuSRZ1huPLNJuyCZJtWzNiUZu9xA_g/exec',
+  servidor: 'https://script.google.com/macros/s/AKfycbzm0YuwWZocpHDPIYF2azQjCoRr52mTX7tUfazOxW9wT6258SjuvL_hzGRS48fxWd8M/exec',
   demo: false,               // true: muestra ayudas de prueba (chips, claves de demo, reinicio)
   periodo: (() => { // mes en curso; el servidor confirma el plazo (propiedad PLAZO_DIA, 25 si no está)
     const d = new Date(), M = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
