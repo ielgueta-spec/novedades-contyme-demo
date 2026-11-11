@@ -91,7 +91,14 @@ p { margin: 0; }
 .top p { color: var(--head-sub); font-size: 15px; }
 .estado { background: rgba(255,255,255,.12); border-radius: 12px; padding: 10px 12px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 15px; }
 .plazo-urgente { background: #FFE7B3; color: #4A3200 !important; border-radius: 8px; padding: 6px 10px; font-weight: 700; }
-.conv { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); }
+.hist { margin-top: 24px; }
+.hist-lista { list-style: none; padding: 0; margin: 10px 0 0; border-left: 2px solid var(--line); margin-left: 7px; }
+.hist-item { position: relative; display: flex; gap: 12px; padding: 0 0 16px 16px; }
+.hist-punto { position: absolute; left: -8px; top: 5px; width: 14px; height: 14px; border-radius: 50%; background: var(--card); border: 3px solid var(--line-fuerte); }
+.hist-item.de-contyme .hist-punto { border-color: var(--brand-ink); background: var(--brand-soft); }
+.hist-fecha { display: block; font-size: 13px; }
+.hist-texto { margin-top: 6px; padding: 8px 12px; background: var(--brand-soft); border-radius: 10px; white-space: pre-wrap; overflow-wrap: anywhere; }
+.hist-item.de-cliente .hist-texto { background: var(--bg); border: 1px solid var(--line); }
 .burbujas { list-style: none; padding: 0; margin: 10px 0 14px; display: flex; flex-direction: column; gap: 10px; }
 .burbuja { max-width: 88%; padding: 10px 14px; border-radius: 14px; white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.45; }
 .burbuja.suya { align-self: flex-start; background: var(--card); border: 1px solid var(--line); border-bottom-left-radius: 4px; }
@@ -269,7 +276,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 18; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 19; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -374,7 +381,7 @@ function cargarCliente(d) {
   const previo = s.remutyme[d.rut];
   s.remutyme[d.rut] = { nombre: d.nombre, cartera: '', correoRrhh: '', trabajadores: Array.from(new Set((d.trabajadores || []).concat(previo ? previo.trabajadores : []))) };
   s.cuentas[d.rut] = Object.assign(cuentaNueva(), { hash: 'servidor', correo: d.contacto || '' });
-  s.mensajes = s.mensajes || {}; s.mensajes[d.rut] = d.mensajes || []; if (d.plazo) CONFIG.periodo.plazo = d.plazo;
+  s.historial = s.historial || {}; s.historial[d.rut] = d.historial || []; if (d.plazo) CONFIG.periodo.plazo = d.plazo;
   const local = s.meses[d.rut] || { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null };
   const m = d.mes || {};
   /* enDrive: el respaldo ya está en la carpeta de Contyme; si piden corregir, no hay que volver a subirlo. */
@@ -398,7 +405,7 @@ async function cargarAdmin(listo) {
     s.meses[e.rut] = m && m.enviado ? { novedades: m.novedades.map((n, i) => Object.assign({ id: e.rut + '-' + i }, n)), sinNovedades: m.sinNovedades, enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, listas: !!m.listas, nota: null, carpeta: m.carpeta }
       : { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: m ? m.nota : null };
   });
-  s.actividad = r.actividad || []; s.mensajes = r.mensajes || {}; if (r.plazo) CONFIG.periodo.plazo = r.plazo;
+  s.actividad = r.actividad || []; s.historial = r.historial || {}; if (r.plazo) CONFIG.periodo.plazo = r.plazo;
   guardar(); return true;
 }
 /* Acción de administrador en el servidor; después vuelve a leer todo para quedar igual que el servidor. */
@@ -670,7 +677,7 @@ const srv = {
     },
     restaurar(n, i) { const m = s.meses[soyCliente()]; if (m.enviado) return; m.novedades.splice(Math.min(i, m.novedades.length), 0, n); m.sinNovedades = false; guardar(); },
     sinNovedades(v) { const m = s.meses[soyCliente()]; if (m.enviado || m.novedades.length) return; m.sinNovedades = v; guardar(); },
-    async enviar(avance) {
+    async enviar(avance, comentario) {
       const rut = soyCliente(), m = s.meses[rut], e = s.remutyme[rut], c = s.cuentas[rut];
       if (m.enviado) return { error: 'Ya estaba enviado.' };
       if (!m.novedades.length && !m.sinNovedades) return { error: 'Agrega una novedad o marca que no hubo novedades.' };
@@ -690,7 +697,7 @@ const srv = {
         const mb = archivos.reduce((t, a) => t + a.base64.length * 0.75, 0) / 1048576;
         if (avance) avance(archivos.length ? 'Subiendo tus novedades y ' + plural(archivos.length, 'respaldo', 'respaldos') + ' (' + fmtNum(Math.max(0.1, mb)) + ' MB)… Con fotos puede tardar hasta un minuto.' : 'Enviando a Contyme…');
         const lista = m.novedades.map(n => ({ trabajador: n.trabajador, tipo: n.tipo, detalle: detalle(n), comentario: n.comentario, datos: n.datos, adjunto: n.adjunto ? { nombre: n.adjunto.nombre } : null, trabajadorNuevo: !!n.trabajadorNuevo, nueva: !n.yaEnviada }));
-        let r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos, agregar: !!m.agregando }, 180000);
+        let r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos, agregar: !!m.agregando, comentarioEnvio: comentario || '' }, 180000);
         if (r.error && !r.salir) {
           /* Si se cortó la señal pero Contyme sí lo recibió (o fue un doble toque), se muestra como enviado en vez de un error. */
           const v = await api('cli-datos');
@@ -718,9 +725,10 @@ const srv = {
       registrar(rut, 'correo', 'Recordatorio a ' + s.remutyme[rut].nombre + ' (' + (s.cuentas[rut].correo || s.remutyme[rut].correoRrhh) + '): «Recuerda enviar tus novedades de ' + CONFIG.periodo.mes + ' antes del ' + fmtCorta(CONFIG.periodo.plazo) + '».');
       guardar();
     },
-    marcar(rut, estado) {
+    marcar(rut, estado, nota) {
       soyAdmin(); const m = s.meses[rut]; if (!m || !m.enviado) return;
-      remoto('adm-marcar', { rut, estado });
+      remoto('adm-marcar', { rut, estado, nota: nota || '' });
+      s.historial = s.historial || {}; (s.historial[rut] = s.historial[rut] || []).push({ t: ahora(), evento: estado, resumen: '', de: 'contyme', autor: sesion.correo || '', texto: nota || '' });
       if (estado === 'listas') { m.revisado = true; m.ingresado = true; m.listas = true; }
       else if (estado === 'revisada') { m.revisado = true; m.ingresado = false; m.listas = false; }
       else if (estado === 'ingresada') { m.revisado = true; m.ingresado = true; m.listas = false; }
@@ -970,35 +978,43 @@ function cliMes(d) {
   const puede = m.agregando ? m.novedades.some(x => !x.yaEnviada) : (n || m.sinNovedades);
   const nuevas = m.agregando ? m.novedades.filter(x => !x.yaEnviada).length : n;
   return avisoMensajes(sesion.rut) + agr + nota + '<div class="fila-titulo"><h2 id="titulo" tabindex="-1">Este mes</h2><span class="sub">' + (m.agregando ? plural(nuevas, 'novedad nueva', 'novedades nuevas') : plural(n, 'novedad', 'novedades') + ' en borrador') + '</span></div>' + lista +
-    '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' + listaTrabajadores(d) + conversacion(sesion.rut, 'cliente') +
+    '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' + listaTrabajadores(d) + historialHtml(sesion.rut, 'cliente') +
     (n || m.sinNovedades ? '' : '<button type="button" class="btn-link" data-a="sin-nov" data-v="si">No tuve novedades este mes</button>') +
     errorGeneral() + (ui.enviando ? '<div class="nota nota-info" role="status"><strong>' + esc(ui.enviando) + '</strong><span>No cierres la app hasta que diga «Enviado». Tu borrador sigue guardado.</span></div>' : '') +
     '<button type="button" class="btn btn-pri" data-a="enviar"' + (puede && !ui.enviando ? '' : ' disabled') + (puede ? '' : ' aria-describedby="envio-ay"') + (ui.enviando ? ' aria-busy="true"' : '') + '>' +
     (ui.enviando ? '<span class="gira" aria-hidden="true"></span>Enviando…' : 'Enviar a Contyme') + '</button>' +
     '<p class="sub centro" id="envio-ay">' + (puede ? 'Al enviar, tus novedades quedan en la bandeja de Remuneraciones de Contyme y le avisamos a tu encargada. Hasta entonces es solo un borrador.' : 'Para enviar, agrega una novedad o marca que no hubo novedades.') + '</p>';
 }
+/* Historial del envío del mes: lo que hizo la empresa y cada paso de Contyme, con su nota. */
+const EVENTOS = {
+  enviado: ['Enviaste las novedades', 'La empresa envió las novedades'], agrego: ['Agregaste más novedades', 'La empresa agregó novedades'],
+  corrigio: ['Corregiste tu envío', 'La empresa corrigió su envío'], revisada: ['Contyme revisó tus novedades', 'Marcada revisada'],
+  ingresada: ['Contyme ingresó tus novedades', 'Marcada ingresada'], listas: ['Tus liquidaciones están listas', 'Liquidaciones listas'],
+  reabierto: ['Contyme te pidió revisar algo', 'Pidió corrección'], 'por-revisar': ['Contyme volvió a revisar tu envío', 'Volvió a «Por revisar»']
+};
 function noLeidos(rut) {
   let visto = ''; try { visto = localStorage.getItem('novedades-leido-' + rut) || ''; } catch (e) {}
-  return ((s.mensajes || {})[rut] || []).filter(m => m.de === 'contyme' && String(m.t) > visto).length;
+  return ((s.historial || {})[rut] || []).filter(x => x.de === 'contyme' && String(x.t) > visto).length;
 }
 function marcarLeidos(rut) {
-  const l = (s.mensajes || {})[rut] || []; if (!l.length) return;
+  const l = (s.historial || {})[rut] || []; if (!l.length) return;
   try { localStorage.setItem('novedades-leido-' + rut, String(l[l.length - 1].t)); } catch (e) {}
 }
 function avisoMensajes(rut) {
-  const n = noLeidos(rut);
-  return n ? '<div class="nota nota-info" role="status"><strong>' + (n === 1 ? 'Tienes una respuesta de Contyme' : 'Tienes ' + n + ' respuestas de Contyme') + '</strong><a href="#conv">Ver mensajes ↓</a></div>' : '';
+  const n = noLeidos(rut); if (!n) return '';
+  const u = ((s.historial || {})[rut] || []).filter(x => x.de === 'contyme').slice(-1)[0];
+  return '<div class="nota nota-info" role="status"><strong>' + esc((EVENTOS[u.evento] || ['Contyme actualizó tu envío'])[0]) + '</strong>' +
+    (u.texto ? '<span>«' + esc(u.texto) + '»</span>' : '') + '<a href="#historial">Ver el historial ↓</a></div>';
 }
-function conversacion(rut, quien) {
-  if (!REMOTO) return '';
-  const msgs = ((s.mensajes || {})[rut]) || [], id = quien === 'cliente' ? 'msg-cli' : 'msg-adm';
-  const nombre = m => m.de === 'contyme' ? (quien === 'contyme' ? String(m.autor || 'Contyme').split('@')[0] : 'Contyme') : (quien === 'cliente' ? 'Tú' : 'Empresa');
+function historialHtml(rut, quien) {
+  const h = ((s.historial || {})[rut]) || []; if (!REMOTO || !h.length) return '';
+  const k = quien === 'cliente' ? 0 : 1;
   if (quien === 'cliente') setTimeout(() => marcarLeidos(rut), 0);
-  return '<div class="conv" id="conv"><h2 style="font-size:19px">' + (quien === 'cliente' ? 'Mensajes con Contyme' : 'Mensajes con la empresa') + '</h2>' +
-    (msgs.length ? '<ul class="burbujas">' + msgs.map(m => '<li class="burbuja ' + (m.de === quien ? 'mia' : 'suya') + '"><span class="b-quien">' + esc(nombre(m)) + ' · ' + esc(fmtHora(m.t)) + '</span>' + esc(m.texto) + '</li>').join('') + '</ul>'
-      : '<p class="sub">' + (quien === 'cliente' ? '¿Una duda sobre tus novedades o tus liquidaciones? Escríbenos aquí y tu encargada te responde en la app.' : 'Sin mensajes este mes.') + '</p>') +
-    '<form id="f-' + id + '" novalidate><div class="campo"><label for="' + id + '">' + (quien === 'cliente' ? 'Escribe a Contyme' : 'Responder a la empresa') + '</label><textarea id="' + id + '" rows="2" maxlength="1000"' + aria(id) + '>' + esc(val(id)) + '</textarea>' + pieCampo(id) + '</div>' +
-    '<button type="submit" class="btn btn-sec"' + (ui.cargando ? ' disabled' : '') + '>' + (ui.cargando ? 'Enviando…' : 'Enviar mensaje') + '</button></form></div>';
+  return '<div class="hist" id="historial"><h2 style="font-size:19px">' + (quien === 'cliente' ? 'Historial de tu envío' : 'Historial del envío') + '</h2><ol class="hist-lista">' +
+    h.map(x => '<li class="hist-item ' + (x.de === 'contyme' ? 'de-contyme' : 'de-cliente') + '"><span class="hist-punto" aria-hidden="true"></span><div>' +
+      '<strong>' + esc((EVENTOS[x.evento] || [x.evento, x.evento])[k]) + '</strong>' + (x.resumen ? ' <span class="sub">· ' + esc(x.resumen) + '</span>' : '') +
+      '<span class="sub hist-fecha">' + esc(fmtHora(x.t)) + (quien === 'contyme' && x.autor ? ' · ' + esc(String(x.autor).split('@')[0]) : '') + '</span>' +
+      (x.texto ? '<div class="hist-texto">«' + esc(x.texto) + '»</div>' : '') + '</div></li>').join('') + '</ol></div>';
 }
 function listaTrabajadores(d) {
   const lista = (d.trabajadores || []).slice().sort((a, b) => a.localeCompare(b, 'es'));
@@ -1021,9 +1037,9 @@ function cliEnviado(d) {
     '<div>Quedó en la bandeja de Remuneraciones de Contyme y tu encargada recibió un aviso.' + (d.correo ? ' Te mandamos la confirmación a ' + esc(d.correo) + '.' : '') + '</div></div></div>' +
     '<h2 id="titulo" tabindex="-1" style="font-size:19px">En qué va</h2><ol class="pasos">' + pasos.map((p, i) =>
       '<li class="paso' + (p[2] ? ' hecho' : '') + '"><div class="paso-marca"><span class="punto">' + (p[2] ? ICO.checkChico : '') + '</span>' + (i < pasos.length - 1 ? '<span class="linea"></span>' : '') + '</div>' +
-      '<div class="paso-txt"><strong>' + p[0] + '<span class="sr">' + (p[2] ? ' (hecho)' : ' (pendiente)') + '</span></strong><span>' + esc(p[1]) + '</span></div></li>').join('') + '</ol>' +
+      '<div class="paso-txt"><strong>' + p[0] + '<span class="sr">' + (p[2] ? ' (hecho)' : ' (pendiente)') + '</span></strong><span>' + esc(p[1]) + '</span></div></li>').join('') + '</ol>' + historialHtml(sesion.rut, 'cliente') +
     (n ? '<h2 style="font-size:19px">Lo que enviaste</h2><ul class="lista">' + m.novedades.map(x => itemNovedad(x)).join('') + '</ul>' : '') +
-    '<button type="button" class="btn btn-sec" data-a="agregar-mas">+ Agregar más novedades</button>' + listaTrabajadores(d) + conversacion(sesion.rut, 'cliente') +
+    '<button type="button" class="btn btn-sec" data-a="agregar-mas">+ Agregar más novedades</button>' + listaTrabajadores(d) +
     '<p class="sub centro">¿Pasó algo más este mes? Agrégalo cuando quieras. Para corregir algo ya enviado, escríbele a tu encargada.</p>';
 }
 function cliNueva(d) {
@@ -1119,7 +1135,7 @@ function admBandeja() {
     const nov = m && m.enviado ? (m.novedades.length ? String(m.novedades.length) : 'Sin novedades') + (faltan ? ' <span class="pill p-warn">' + plural(faltan, 'sin respaldo', 'sin respaldo') + '</span>' : '') : '<span class="sub">—</span>';
     const env = m && m.enviado ? esc(fmtHora(m.enviado)) : (s.recordados[r] ? '<span class="sub">Recordado ' + esc(fmtHora(s.recordados[r])) + '</span> ' : '') +
       '<button type="button" class="btn btn-sec btn-chico" data-a="recordar" data-v="' + r + '">' + (s.recordados[r] ? 'Recordar otra vez' : 'Recordar') + '</button>';
-    return '<tr' + (r === sel ? ' class="sel"' : '') + '><td data-l="Empresa"><button type="button" class="fila-btn" data-a="sel" data-v="' + r + '"' + (r === sel ? ' aria-current="true"' : '') + '>' + esc(s.remutyme[r].nombre) + '</button>' + (((s.mensajes || {})[r] || []).slice(-1).some(x => x.de === 'cliente') ? ' <span class="pill p-warn">Mensaje nuevo</span>' : '') + (s.meses[r] && s.meses[r].listas ? ' <span class="pill p-ok">Listas</span>' : '') + '<div class="sub mono">' + rutBonito(r) + ' · ' + esc(s.remutyme[r].cartera) + '</div></td>' +
+    return '<tr' + (r === sel ? ' class="sel"' : '') + '><td data-l="Empresa"><button type="button" class="fila-btn" data-a="sel" data-v="' + r + '"' + (r === sel ? ' aria-current="true"' : '') + '>' + esc(s.remutyme[r].nombre) + '</button>' + (((s.historial || {})[r] || []).slice(-1).some(x => x.de === 'cliente' && x.texto) ? ' <span class="pill p-warn">Con mensaje</span>' : '') + (s.meses[r] && s.meses[r].listas ? ' <span class="pill p-ok">Listas</span>' : '') + '<div class="sub mono">' + rutBonito(r) + ' · ' + esc(s.remutyme[r].cartera) + '</div></td>' +
       '<td data-l="Estado"><span class="pill ' + e[1] + '">' + e[0] + '</span></td><td data-l="Novedades">' + nov + '</td><td data-l="Enviado">' + env + '</td></tr>';
   }).join('');
   const tabla = vis.length ? '<div class="ancho tabla-caja"><table class="tabla-resp"><caption class="sr">Empresas y estado de sus novedades de ' + esc(CONFIG.periodo.mes) + '</caption><thead><tr><th scope="col">Empresa</th><th scope="col">Estado</th><th scope="col">Novedades</th><th scope="col">Enviado</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
@@ -1141,6 +1157,7 @@ function admDetalle(sel) {
       (m.nota ? '<div class="nota nota-warn"><strong>Le pediste revisar:</strong><span>«' + esc(m.nota) + '»</span></div>' : '');
   } else {
     cuerpo = (m.novedades.length ? '<ul class="lista">' + m.novedades.map(x => itemNovedad(x)).join('') + '</ul>' : '<div class="vacio"><strong>Sin novedades</strong><span class="sub">El cliente confirmó que no hubo cambios.</span></div>') +
+      (m.listas ? '' : '<div class="campo"><label for="nota-adm">Nota para el cliente (opcional)</label><textarea id="nota-adm" rows="2" maxlength="1000" placeholder="Ej. el bono de Pedro va en una liquidación complementaria"' + aria('nota-adm') + '>' + esc(val('nota-adm')) + '</textarea><span class="sub">Queda en el historial del cliente al marcar el paso y le llega por correo.</span></div>') +
       '<div class="acciones">' +
       (m.revisado ? '' : '<button type="button" class="btn btn-sec" data-a="marcar" data-v="revisada">Marcar revisada</button>') +
       (m.ingresado ? '' : '<button type="button" class="btn btn-pri" data-a="marcar" data-v="ingresada">Marcar ingresada</button>') +
@@ -1151,7 +1168,7 @@ function admDetalle(sel) {
       '<p class="sub">Lo que marques lo ve el cliente en «En qué va». «Liquidaciones listas» además le avisa por correo.</p>';
   }
   return '<div class="caja"><div><h2 id="det-titulo" tabindex="-1" style="font-size:18px">' + esc(e.nombre) + '</h2><span class="sub mono">' + rutBonito(sel) + ' · ' + esc(e.cartera) + (c.correo ? ' · ' + esc(c.correo) : '') + '</span></div>' +
-    '<div><span class="pill ' + est[1] + '">' + est[0] + '</span> <span class="sub">' + (m.enviado ? 'Enviado el ' + esc(fmtHora(m.enviado)) : 'Aún no envía ' + esc(CONFIG.periodo.mes)) + '</span></div>' + cuerpo + conversacion(sel, 'contyme') + '</div>';
+    '<div><span class="pill ' + est[1] + '">' + est[0] + '</span> <span class="sub">' + (m.enviado ? 'Enviado el ' + esc(fmtHora(m.enviado)) : 'Aún no envía ' + esc(CONFIG.periodo.mes)) + '</span></div>' + cuerpo + historialHtml(sel, 'contyme') + '</div>';
 }
 function admEmpresas() {
   const ruts = srv.adm.empresas(), lnk = modo() === 'link';
@@ -1427,13 +1444,15 @@ const ACC = {
       html: (n ? '<ul>' + m.novedades.filter(x => !x.yaEnviada).map(x => '<li><b>' + esc(x.trabajador) + '</b>: ' + esc(x.tipo.toLowerCase()) + ' · ' + esc(detalle(x)) + '</li>').join('') + '</ul>' : '<p>Contyme hará las liquidaciones de ' + esc(CONFIG.periodo.mes) + ' igual que el mes pasado.</p>') +
         (faltan.length ? '<div class="nota nota-warn">' + plural(faltan.length, 'novedad no tiene', 'novedades no tienen') + ' respaldo (' + esc(faltan.map(x => x.trabajador).join(', ')) + '). Puedes enviar igual; Contyme te lo pedirá.</div>' : '') +
         (ejemplos ? '<div class="nota nota-info">Hay ' + plural(ejemplos, 'novedad de ejemplo', 'novedades de ejemplo') + ' de la demo. Quítalas si no corresponden.</div>' : '') +
-        '<p class="sub">Después de enviar ya no puedes cambiarlas, pero sí agregar más durante el mes.</p>',
+        '<p class="sub">Después de enviar ya no puedes cambiarlas, pero sí agregar más durante el mes.</p>' +
+        (REMOTO ? '<div class="campo"><label for="dlg-com">Mensaje para Contyme (opcional)</label><textarea id="dlg-com" rows="2" maxlength="1000" placeholder="Ej. el bono de Pedro va aparte"></textarea><span class="sub">Lo ve tu encargada y queda en el historial de tu envío.</span></div>' : ''),
       ok: 'Sí, enviar', cancelar: 'Revisar de nuevo',
-      accion: () => {
+      accion: dlgEl => {
         if (ui.enviando) return;
+        const comentario = dlgEl && dlgEl.querySelector('#dlg-com') ? dlgEl.querySelector('#dlg-com').value.trim() : '';
         const avance = txt => { if (!sesion) return; ui.enviando = txt; ui.err = null; pintar(); };
         if (REMOTO) avance('Enviando a Contyme…');
-        srv.cli.enviar(avance).catch(() => ({ error: 'Algo falló al preparar el envío. Intenta de nuevo.' })).then(r => {
+        srv.cli.enviar(avance, comentario).catch(() => ({ error: 'Algo falló al preparar el envío. Intenta de nuevo.' })).then(r => {
           ui.enviando = null; if (!sesion) return;
           if (r.error) { ui.err = { msg: r.error }; ui.foco = '[data-a="enviar"]'; pintar(); toast(r.error); return; }
           ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Enviado a Contyme');
@@ -1452,7 +1471,7 @@ const ACC = {
     dialogo({ titulo: '¿Recordar a ' + plural(p.length, 'empresa', 'empresas') + '?', html: '<ul>' + p.map(r => '<li>' + esc(s.remutyme[r].nombre) + (s.recordados[r] ? ' <span class="sub">(ya recordada ' + esc(fmtHora(s.recordados[r])) + ')</span>' : '') + '</li>').join('') + '</ul><p class="sub">Les llega un correo corto pidiendo que envíen sus novedades antes del ' + esc(fmtCorta(CONFIG.periodo.plazo)) + '.</p>',
       ok: 'Enviar recordatorios', accion: () => { p.forEach(r => srv.adm.recordar(r)); pintar(); toast(plural(p.length, 'recordatorio enviado', 'recordatorios enviados') + SIM); } });
   },
-  marcar: v => { srv.adm.marcar(ui.sel, v); ui.foco = 'det-titulo'; pintar(); toast(v === 'revisada' ? 'Marcada revisada' : v === 'ingresada' ? 'Marcada ingresada' : 'Vuelve a «Por revisar»'); },
+  marcar: v => { const nota = String(val('nota-adm') || '').trim(); srv.adm.marcar(ui.sel, v, nota); ui.form['nota-adm'] = ''; ui.foco = 'det-titulo'; pintar(); toast(v === 'revisada' ? 'Marcada revisada' : v === 'ingresada' ? 'Marcada ingresada' : 'Vuelve a «Por revisar»'); },
   copiar: () => copiar(textoExcel(ui.sel)),
   reabrir: () => {
     const nom = s.remutyme[ui.sel].nombre, rut = ui.sel;
@@ -1652,23 +1671,6 @@ const SUB = {
     const editado = ui.editando != null;
     ir('mes');
     toast(repetida ? 'Guardada. Ojo: ' + trabajador + ' ya tenía otra novedad de ese tipo; revisa que no esté repetida.' : editado ? 'Cambios guardados' : 'Novedad guardada. Falta enviar a Contyme.');
-  },
-  'f-msg-cli': async () => {
-    if (ui.cargando) return;
-    const txt = String(val('msg-cli')).trim(); if (txt.length < 2) return falla('msg-cli', 'Escribe tu mensaje.');
-    ui.cargando = true; pintar();
-    const r = await api('cli-mensaje', { texto: txt }); ui.cargando = false;
-    if (!r.ok) return falla(r.campo || null, r.error);
-    s.mensajes = s.mensajes || {}; s.mensajes[sesion.rut] = r.mensajes; ui.form['msg-cli'] = ''; guardar(); ui.foco = 'msg-cli'; pintar(); toast('Mensaje enviado a Contyme');
-  },
-  'f-msg-adm': async () => {
-    if (ui.cargando || !ui.sel) return;
-    const txt = String(val('msg-adm')).trim(); if (txt.length < 2) return falla('msg-adm', 'Escribe la respuesta.');
-    ui.cargando = true; pintar();
-    const r = await api('adm-mensaje', { rut: ui.sel, texto: txt, conDatos: true }); ui.cargando = false;
-    if (!r.ok) return falla(r.campo || null, r.error);
-    if (r.datosAdm) await cargarAdmin(r.datosAdm);
-    ui.form['msg-adm'] = ''; ui.foco = 'msg-adm'; pintar(); toast('Respuesta enviada: la ve en la app y le llega un aviso al correo');
   },
   'f-trab': () => {
     const texto = val('masiva-trab');
