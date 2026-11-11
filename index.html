@@ -124,6 +124,9 @@ main.cli { flex: 1; padding-block: 18px 28px; display: flex; flex-direction: col
 .btn-link { background: transparent; border: 0; color: var(--brand-ink); font-weight: 600; text-decoration: underline; min-height: 44px; cursor: pointer; padding: 0 6px; }
 .btn-link.chico { font-size: 14px; color: var(--muted); }
 .btn[disabled] { opacity: .55; cursor: not-allowed; }
+.btn[aria-busy="true"] { opacity: .85; cursor: progress; }
+.gira { width: 18px; height: 18px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; display: inline-block; flex-shrink: 0; }
+@media (prefers-reduced-motion: no-preference) { .gira { animation: gira .8s linear infinite; } @keyframes gira { to { transform: rotate(360deg); } } }
 
 .campo { display: flex; flex-direction: column; gap: 6px; }
 .campo > label, legend { font-size: 15px; font-weight: 700; }
@@ -303,15 +306,36 @@ async function preClave(rutTxt, clave) {
     return Array.from(new Uint8Array(b)).map(x => x.toString(16).padStart(2, '0')).join('');
   } catch (e) { return ''; }
 }
-async function api(accion, datos) {
+/* La clave se calcula mientras la persona escribe (ver adelantarClave): al tocar «Entrar» ya está lista. Solo en memoria. */
+let preMemo = { k: '', p: null };
+function preClaveLista(rutTxt, clave) {
+  const k = normRut(rutTxt) + '|' + clave;
+  if (preMemo.k !== k) preMemo = { k, p: preClave(rutTxt, clave) };
+  return preMemo.p;
+}
+let tPre = null;
+function adelantarClave() {
+  clearTimeout(tPre);
+  tPre = setTimeout(() => {
+    if (!REMOTO || sesion) return;
+    if (ui.paso === 'crear' && ui.crearPara) { const n = String(val('nueva')); if (n.length >= CONFIG.claveMin) preClaveLista(ui.crearPara.rut, n); return; }
+    const r = normRut(val('rut')), c = String(val('clave'));
+    if (r && dvValido(r) && c.length >= 4) preClaveLista(val('rut'), c);
+  }, 350);
+}
+/* ms: cuánto esperar antes de rendirse (sin esto, una señal mala dejaba la app «pensando» para siempre). */
+async function api(accion, datos, ms) {
+  const ctl = window.AbortController ? new AbortController() : null, reloj = ctl ? setTimeout(() => ctl.abort(), ms || 60000) : null;
   try {
-    const r = await fetch(CONFIG.servidor, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ accion, token: sesion && sesion.token, periodo: CONFIG.periodo.id }, datos || {})) });
+    const r = await fetch(CONFIG.servidor, { method: 'POST', headers: { 'Content-Type': 'text/plain;charset=utf-8' }, body: JSON.stringify(Object.assign({ accion, token: sesion && sesion.token, periodo: CONFIG.periodo.id }, datos || {})), signal: ctl ? ctl.signal : undefined });
     const j = await r.json();
     if (j && j.salir && sesion) { cerrarSesion(j.error || 'Tu sesión venció. Vuelve a entrar.'); }
     return j || { error: 'Respuesta vacía del servidor.' };
-  } catch (e) { return { error: 'No hay conexión con Contyme. Revisa tu internet e intenta de nuevo.' }; }
+  } catch (e) { return { error: e && e.name === 'AbortError' ? 'Contyme está tardando demasiado en responder. Revisa tu internet e intenta de nuevo.' : 'No hay conexión con Contyme. Revisa tu internet e intenta de nuevo.' }; }
+  finally { if (reloj) clearTimeout(reloj); }
 }
 const archivosMem = new Map(); // id de novedad → archivo (para subirlo al enviar)
+const chicas = new WeakMap();  // archivo → foto ya achicada (se achica al adjuntarla, no al enviar)
 /* Las fotos se achican en el teléfono (máx. 1800 px, JPEG) antes de subirlas: de varios MB a unos 300 KB. */
 async function achicarFoto(f) {
   if (!/^image\/(jpeg|png|webp|heic|heif)$/i.test(f.type || '') || f.size < 400 * 1024) return null;
@@ -332,7 +356,12 @@ function cargarCliente(d) {
   s.cuentas[d.rut] = Object.assign(cuentaNueva(), { hash: 'servidor', correo: d.contacto || '' });
   const local = s.meses[d.rut] || { novedades: [], sinNovedades: false, enviado: null, revisado: false, ingresado: false, nota: null };
   const m = d.mes || {};
-  if (m.enviado) s.meses[d.rut] = { novedades: (m.novedades || []).map((n, i) => Object.assign({ id: 'e' + i }, n)), sinNovedades: !!m.sinNovedades, enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, nota: null };
+  /* enDrive: el respaldo ya está en la carpeta de Contyme; si piden corregir, no hay que volver a subirlo. */
+  const enDrive = n => n.adjunto && !/\(no llegó el archivo\)$/.test(n.adjunto.nombre || '') ? { adjunto: Object.assign({}, n.adjunto, { enDrive: true }) } : {};
+  if (m.enviado) s.meses[d.rut] = { novedades: (m.novedades || []).map((n, i) => Object.assign({ id: 'e' + i }, n, enDrive(n))), sinNovedades: !!m.sinNovedades, enviado: m.enviado, revisado: m.revisado, ingresado: m.ingresado, nota: null };
+  /* Reabierto: si en este dispositivo no hay un borrador propio, se trae lo enviado para corregirlo. */
+  else if (m.reabierto && m.novedades && (local.enviado || (!local.novedades.length && !local.sinNovedades)))
+    s.meses[d.rut] = { novedades: m.novedades.map((n, i) => Object.assign({ id: 'e' + i }, n, enDrive(n))), sinNovedades: !!m.sinNovedades, enviado: null, revisado: false, ingresado: false, nota: m.nota || null };
   else s.meses[d.rut] = Object.assign(local, { enviado: null, revisado: false, ingresado: false, nota: m.nota || local.nota || null });
   guardar();
 }
@@ -353,11 +382,12 @@ async function cargarAdmin(listo) {
 /* Acción de administrador en el servidor; después vuelve a leer todo para quedar igual que el servidor. */
 function remoto(accion, datos) {
   if (!REMOTO) return;
-  api(accion, Object.assign({ conDatos: true }, datos)).then(r => { if (r.error) toast(r.error); return cargarAdmin(r.datosAdm); }).then(() => { if (sesion) pintar(); });
+  api(accion, Object.assign({ conDatos: true }, datos), accion === 'adm-habilitar' ? 330000 : 0).then(r => { if (r.error) toast(r.error); return cargarAdmin(r.datosAdm); }).then(() => { if (sesion) pintar(); });
 }
 const LS = 'novedades-contyme-v5';
 const SS = 'novedades-contyme-sesion-v5';
 const LS_TEMA = 'novedades-contyme-tema';
+const LS_RUT = 'novedades-contyme-rut'; // solo el RUT de la empresa (nunca la clave), para no escribirlo cada vez
 
 const TIPOS = {
   'Horas extra': { campos: [{ id: 'horas', l: 'Cantidad de horas', t: 'num', ej: 'Ej. 6', min: 0.5, max: 120, ayuda: 'Puedes usar medias horas, por ejemplo 2,5.' }] },
@@ -489,7 +519,7 @@ const srv = {
   async ingresar(rutTxt, clave) {
     await listo;
     if (REMOTO) {
-      const r = await api('ingresar', { rut: rutTxt, clave, pre: await preClave(rutTxt, clave) });
+      const r = await api('ingresar', { rut: rutTxt, clave, pre: await preClaveLista(rutTxt, clave) });
       if (r.ok) { cargarCliente(r.datos); return { ok: true, rut: r.rut, token: r.token }; }
       if (r.paso === 'crear') tickets.set(r.ticket, { rut: r.rut, remoto: true, vence: Date.now() + 10 * 60e3 });
       return r;
@@ -531,7 +561,7 @@ const srv = {
     if (!t || t.vence < Date.now()) return { error: 'Pasó mucho rato. Vuelve a empezar el ingreso.', reiniciar: true };
     if (t.remoto) {
       if (nueva !== repite) return { campo: 'repite', error: 'Las dos claves no son iguales.' };
-      const tk = tickets.get(ticket), r = await api('crear-clave', { ticket, nueva, correo, pre: tk ? await preClave(tk.rut, nueva) : '' });
+      const tk = tickets.get(ticket), r = await api('crear-clave', { ticket, nueva, correo, pre: tk ? await preClaveLista(tk.rut, nueva) : '' });
       if (r.ok) { tickets.delete(ticket); cargarCliente(r.datos); return { ok: true, rut: r.rut, token: r.token }; }
       return r;
     }
@@ -584,28 +614,36 @@ const srv = {
     },
     quitar(id) {
       const m = s.meses[soyCliente()]; if (m.enviado) return null;
-      const i = m.novedades.findIndex(x => x.id === id); if (i < 0) return null;
+      const i = m.novedades.findIndex(x => String(x.id) === String(id)); if (i < 0) return null;
       const [n] = m.novedades.splice(i, 1); guardar(); return { n, i };
     },
     restaurar(n, i) { const m = s.meses[soyCliente()]; if (m.enviado) return; m.novedades.splice(Math.min(i, m.novedades.length), 0, n); m.sinNovedades = false; guardar(); },
     sinNovedades(v) { const m = s.meses[soyCliente()]; if (m.enviado || m.novedades.length) return; m.sinNovedades = v; guardar(); },
-    async enviar() {
+    async enviar(avance) {
       const rut = soyCliente(), m = s.meses[rut], e = s.remutyme[rut], c = s.cuentas[rut];
       if (m.enviado) return { error: 'Ya estaba enviado.' };
       if (!m.novedades.length && !m.sinNovedades) return { error: 'Agrega una novedad o marca que no hubo novedades.' };
       if (REMOTO) {
-        const sinArchivo = m.novedades.filter(n => n.adjunto && !archivosMem.has(n.id));
+        const sinArchivo = m.novedades.filter(n => n.adjunto && !archivosMem.has(n.id) && !n.adjunto.enDrive);
         if (sinArchivo.length) return { error: 'Vuelve a adjuntar el respaldo de ' + sinArchivo.map(n => n.trabajador).join(', ') + ' (se pierde al cerrar la app). Toca la novedad → Editar.' };
-        const archivos = [];
+        const archivos = [], cuantos = m.novedades.filter(n => archivosMem.has(n.id)).length;
+        if (avance && cuantos) avance('Preparando ' + plural(cuantos, 'respaldo', 'respaldos') + '…');
         for (let i = 0; i < m.novedades.length; i++) {
           const f = archivosMem.get(m.novedades[i].id);
           if (!f) continue;
-          const chica = await achicarFoto(f), nombre = m.novedades[i].adjunto.nombre;
+          const chica = await (chicas.get(f) || achicarFoto(f)), nombre = m.novedades[i].adjunto.nombre;
           archivos.push(chica ? { idx: i, nombre: nombre.replace(/\.[a-z0-9]+$/i, '') + '.jpg', mime: 'image/jpeg', base64: await aBase64(chica) }
             : { idx: i, nombre, mime: m.novedades[i].adjunto.mime, base64: await aBase64(f) });
         }
+        const mb = archivos.reduce((t, a) => t + a.base64.length * 0.75, 0) / 1048576;
+        if (avance) avance(archivos.length ? 'Subiendo tus novedades y ' + plural(archivos.length, 'respaldo', 'respaldos') + ' (' + fmtNum(Math.max(0.1, mb)) + ' MB)… Con fotos puede tardar hasta un minuto.' : 'Enviando a Contyme…');
         const lista = m.novedades.map(n => ({ trabajador: n.trabajador, tipo: n.tipo, detalle: detalle(n), comentario: n.comentario, datos: n.datos, adjunto: n.adjunto ? { nombre: n.adjunto.nombre } : null, trabajadorNuevo: !!n.trabajadorNuevo }));
-        const r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos });
+        let r = await api('enviar', { novedades: lista, sinNovedades: !!m.sinNovedades, archivos }, 180000);
+        if (r.error && !r.salir) {
+          /* Si se cortó la señal pero Contyme sí lo recibió (o fue un doble toque), se muestra como enviado en vez de un error. */
+          const v = await api('cli-datos');
+          if (v.ok && v.datos && v.datos.mes && v.datos.mes.enviado) r = { ok: true, datos: v.datos };
+        }
         if (r.error) return r;
         archivosMem.clear(); cargarCliente(r.datos); return { ok: true };
       }
@@ -703,7 +741,7 @@ const srv = {
 };
 
 /* ---------- Estado de pantalla ---------- */
-const uiInicial = () => ({ paso: 'rut', ticket: null, crearPara: null, form: {}, err: null, aviso: '', cargando: false, tab: 'mes', tipo: null, editando: null, archivo: null, admTab: 'bandeja', sel: null, filtro: 'todas', buscar: '', carga: null, ultimoLink: null, actFiltro: 'todo', foco: null });
+const uiInicial = () => ({ paso: 'rut', ticket: null, crearPara: null, form: { rut: leerLS(LS_RUT) || '' }, err: null, aviso: '', cargando: false, tab: 'mes', tipo: null, editando: null, archivo: null, admTab: 'bandeja', sel: null, filtro: 'todas', buscar: '', carga: null, ultimoLink: null, actFiltro: 'todo', foco: null });
 let ui = uiInicial();
 const val = id => ui.form[id] == null ? '' : ui.form[id];
 
@@ -844,13 +882,15 @@ function cliMes(d) {
   return nota + '<div class="fila-titulo"><h2 id="titulo" tabindex="-1">Este mes</h2><span class="sub">' + plural(n, 'novedad', 'novedades') + ' en borrador</span></div>' + lista +
     '<button type="button" class="btn btn-sec" data-a="nueva">+ Agregar novedad</button>' +
     (n || m.sinNovedades ? '' : '<button type="button" class="btn-link" data-a="sin-nov" data-v="si">No tuve novedades este mes</button>') +
-    '<button type="button" class="btn btn-pri" data-a="enviar"' + (puede ? '' : ' disabled aria-describedby="envio-ay"') + '>Enviar a Contyme</button>' +
+    errorGeneral() + (ui.enviando ? '<div class="nota nota-info" role="status"><strong>' + esc(ui.enviando) + '</strong><span>No cierres la app hasta que diga «Enviado». Tu borrador sigue guardado.</span></div>' : '') +
+    '<button type="button" class="btn btn-pri" data-a="enviar"' + (puede && !ui.enviando ? '' : ' disabled') + (puede ? '' : ' aria-describedby="envio-ay"') + (ui.enviando ? ' aria-busy="true"' : '') + '>' +
+    (ui.enviando ? '<span class="gira" aria-hidden="true"></span>Enviando…' : 'Enviar a Contyme') + '</button>' +
     '<p class="sub centro" id="envio-ay">' + (puede ? 'Al enviar, tus novedades quedan en la bandeja de Remuneraciones de Contyme y le avisamos a tu encargada. Hasta entonces es solo un borrador.' : 'Para enviar, agrega una novedad o marca que no hubo novedades.') + '</p>';
 }
 function cliEnviado(d) {
   const m = d.mes, n = m.novedades.length;
   const pasos = [['Enviadas', fmtDia(new Date(m.enviado)), true], ['Revisadas por Contyme', m.revisado ? 'Listo' : 'Te escribimos si falta algo', m.revisado],
-    ['Ingresadas', m.ingresado ? 'Ya estamos haciendo tus liquidaciones' : 'Pendiente', m.ingresado], ['Liquidaciones listas', 'Aparecen en «Liquidaciones» para descargar', false]];
+    ['Ingresadas', m.ingresado ? 'Ya estamos haciendo tus liquidaciones' : 'Pendiente', m.ingresado], ['Liquidaciones listas', REMOTO ? 'Tu encargada te avisa cuando estén' : 'Aparecen en «Liquidaciones» para descargar', false]];
   return '<div class="aviso-ok" role="status">' + ICO.check + '<div><strong>' + (n ? 'Enviaste ' + plural(n, 'novedad', 'novedades') : 'Avisaste que no hubo novedades') + '</strong>' +
     '<div>Quedó en la bandeja de Remuneraciones de Contyme y tu encargada recibió un aviso.' + (d.correo ? ' Te mandamos la confirmación a ' + esc(d.correo) + '.' : '') + '</div></div></div>' +
     '<h2 id="titulo" tabindex="-1" style="font-size:19px">En qué va</h2><ol class="pasos">' + pasos.map((p, i) =>
@@ -881,7 +921,7 @@ function cliNueva(d) {
     if (def.adj) {
       const a = ui.archivo;
       html += '<fieldset><legend><span class="num" aria-hidden="true">' + (n++) + '</span>Respaldo' + (def.importante ? '' : ' (opcional)') + '</legend>' +
-        (a ? '<div class="archivo-listo">' + (a.url && /^image\//.test(a.mime) ? '<img src="' + esc(a.url) + '" alt="Vista previa del respaldo">' : ICO.doc) + '<span>' + esc(a.nombre) + ' · ' + fmtNum(a.kb) + ' KB</span>' +
+        (a ? '<div class="archivo-listo">' + (a.url && /^image\//.test(a.mime) ? '<img src="' + esc(a.url) + '" alt="Vista previa del respaldo">' : ICO.doc) + '<span>' + esc(a.nombre) + (a.kb ? ' · ' + fmtNum(a.kb) + ' KB' : a.enDrive ? ' · ya está en Contyme' : '') + '</span>' +
           '<button type="button" class="btn btn-sec btn-chico" data-a="quitar-archivo">Cambiar</button></div>'
           : '<label class="foto">' + ICO.camara + '<span>' + esc(def.adj) + '</span><input id="archivo" type="file" accept="image/*,application/pdf"' + aria('archivo', 'archivo-ay2') + '></label>' +
             '<span class="sub" id="archivo-ay2-ay">Foto o PDF de hasta ' + CONFIG.maxArchivoMB + ' MB.' + (def.importante ? ' Si no la tienes ahora, puedes guardar igual y Contyme te la pedirá.' : '') + '</span>' + pieCampo('archivo')) + '</fieldset>';
@@ -919,7 +959,7 @@ function vistaCliente() {
     '<div class="estado"><span>' + esc(e[0]) + '</span><span class="pill ' + e[2] + '">' + e[1] + '</span></div>' +
     (d.mes.enviado ? '' : '<div class="plazo">' + ICO.reloj + '<span>' + esc(plazoTxt()) + '</span></div>') + '</header>' +
     '<main id="principal" class="cli gutter entra">' + cuerpo + '</main>' +
-    '<nav class="tabs" aria-label="Secciones">' + tab('mes', 'Este mes', ICO.cal, borr) + tab('nueva', ui.editando != null ? 'Editar' : 'Nueva', ICO.mas) + tab('historial', 'Liquidaciones', ICO.doc) + '</nav></div>';
+    '<nav class="tabs" aria-label="Secciones"' + (REMOTO ? ' style="grid-template-columns:repeat(2,minmax(0,1fr))"' : '') + '>' + tab('mes', 'Este mes', ICO.cal, borr) + tab('nueva', ui.editando != null ? 'Editar' : 'Nueva', ICO.mas) + (REMOTO ? '' : tab('historial', 'Liquidaciones', ICO.doc)) + '</nav></div>';
 }
 
 /* ---------- Vista: administración ---------- */
@@ -1127,11 +1167,12 @@ $('toast').addEventListener('click', ev => { if (ev.target.closest('[data-toast]
 
 /* ---------- Sesión ---------- */
 function entrar(nueva, saludo) {
+  preMemo = { k: '', p: null }; // la clave transformada no queda en memoria después de entrar
   sesion = Object.assign(nueva, { ultimo: Date.now() }); guardarSesion();
   ui = uiInicial(); ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast(saludo);
 }
 function cerrarSesion(motivo, sinPintar) {
-  sesion = null; guardarSesion(); tickets.clear();
+  sesion = null; guardarSesion(); tickets.clear(); preMemo = { k: '', p: null };
   previas.forEach(u => { try { URL.revokeObjectURL(u); } catch (e) {} }); previas.clear();
   if (ui.archivo && ui.archivo.url) { try { URL.revokeObjectURL(ui.archivo.url); } catch (e) {} }
   ui = uiInicial(); ui.aviso = motivo || ''; ui.foco = 'titulo';
@@ -1197,7 +1238,8 @@ const ACC = {
     pintar();
   },
   editar: v => {
-    const id = Number(v), n = srv.cli.datos().mes.novedades.find(x => x.id === id); if (!n) return;
+    const n = srv.cli.datos().mes.novedades.find(x => String(x.id) === String(v)); if (!n) return;
+    const id = n.id; // las novedades que vuelven de un envío reabierto tienen id de texto («e0», «e1»…)
     const d = srv.cli.datos();
     ui.form = { comentario: n.comentario };
     if (!TIPOS[n.tipo].sinTrabajador) { if (d.trabajadores.includes(n.trabajador)) ui.form.trabajador = n.trabajador; else { ui.form.trabajador = '__otro'; ui.form['trab-otro'] = n.trabajador; } }
@@ -1206,13 +1248,13 @@ const ACC = {
     ir('nueva', true);
   },
   quitar: v => {
-    const r = srv.cli.quitar(Number(v)); if (!r) return;
+    const r = srv.cli.quitar(v); if (!r) return;
     pintar(); ui.foco = null;
     const sig = document.querySelector('[data-a="nueva"]'); if (sig) sig.focus();
     toast('Quitaste la novedad de ' + r.n.trabajador, { txt: 'Deshacer', fn: () => { srv.cli.restaurar(r.n, r.i); pintar(); toast('Novedad recuperada'); } });
   },
   'quitar-archivo': () => { ui.archivo = null; ui.foco = 'archivo'; pintar(); },
-  'sin-nov': v => { srv.cli.sinNovedades(v === 'si'); ui.foco = '[data-a="enviar"]'; pintar(); toast(v === 'si' ? 'Marcado: sin novedades. Falta enviar.' : 'Listo, agrega tus novedades'); },
+  'sin-nov': v => { srv.cli.sinNovedades(v === 'si'); ui.foco = '[data-a="enviar"]'; pintar(); if (v === 'si') ACC.enviar(); else toast('Listo, agrega tus novedades'); },
   enviar: () => {
     const d = srv.cli.datos(), m = d.mes, n = m.novedades.length;
     const faltan = m.novedades.filter(x => TIPOS[x.tipo] && TIPOS[x.tipo].importante && !x.adjunto);
@@ -1224,7 +1266,16 @@ const ACC = {
         (ejemplos ? '<div class="nota nota-info">Hay ' + plural(ejemplos, 'novedad de ejemplo', 'novedades de ejemplo') + ' de la demo. Quítalas si no corresponden.</div>' : '') +
         '<p class="sub">Después de enviar ya no puedes cambiarlas. Si te falta algo, tu encargada puede reabrir el envío.</p>',
       ok: 'Sí, enviar', cancelar: 'Revisar de nuevo',
-      accion: async () => { if (REMOTO) toast('Enviando a Contyme…'); const r = await srv.cli.enviar(); if (r.error) { toast(r.error); return; } ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Enviado a Contyme'); }
+      accion: () => {
+        if (ui.enviando) return;
+        const avance = txt => { if (!sesion) return; ui.enviando = txt; ui.err = null; pintar(); };
+        if (REMOTO) avance('Enviando a Contyme…');
+        srv.cli.enviar(avance).catch(() => ({ error: 'Algo falló al preparar el envío. Intenta de nuevo.' })).then(r => {
+          ui.enviando = null; if (!sesion) return;
+          if (r.error) { ui.err = { msg: r.error }; ui.foco = '[data-a="enviar"]'; pintar(); toast(r.error); return; }
+          ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); toast('Enviado a Contyme');
+        });
+      }
     });
   },
   pdf: v => toast('Demo: en la app real aquí se descarga el PDF de ' + v + '.'),
@@ -1273,6 +1324,7 @@ document.addEventListener('click', ev => {
   const b = ev.target.closest('#raiz [data-a], #demo-barra [data-a]'); if (!b) return;
   const f = ACC[b.dataset.a]; if (!f) return;
   tocar();
+  if (ui.enviando && b.dataset.a !== 'ver') { toast('Espera un momento: estamos enviando tus novedades a Contyme.'); return; } // sin cambios a medio envío
   try { f(b.dataset.v, b); } catch (e) { toast('Algo falló. Recarga la página e intenta de nuevo.'); if (window.console) console.warn(e); }
 });
 
@@ -1282,6 +1334,7 @@ document.addEventListener('input', ev => {
   ui.form[t.id] = t.value;
   if (ui.err && ui.err.campo === t.id) { t.removeAttribute('aria-invalid'); const e = $(t.id + '-err'); if (e) e.remove(); ui.err = null; }
   if (t.id === 'comentario' && $('contador')) $('contador').textContent = t.value.length + '/500';
+  if (t.id === 'rut' || t.id === 'clave' || t.id === 'nueva') adelantarClave();
   if (t.id === 'buscar') { ui.buscar = t.value; pintar(); }
   if (t.id === 'trabajador') { ui.foco = t.value === '__otro' ? 'trab-otro' : null; pintar(); }
 });
@@ -1305,6 +1358,7 @@ document.addEventListener('change', ev => {
     if (!f.size) { ui.err = { campo: 'archivo', msg: 'El archivo está vacío. Vuelve a sacar la foto.' }; ui.foco = 'archivo'; pintar(); return; }
     const mime = f.type || (/\.pdf$/i.test(f.name) ? 'application/pdf' : 'image/*');
     ui.archivo = { nombre: f.name.slice(0, 80), kb: Math.max(1, Math.round(f.size / 1024)), mime, url: /^image\//.test(mime) ? URL.createObjectURL(f) : null, file: f };
+    if (REMOTO && /^image\//.test(mime) && !chicas.has(f)) chicas.set(f, achicarFoto(f)); // se achica ahora, mientras completa el resto
     ui.err = null; ui.foco = '[data-a="quitar-archivo"]'; pintar(); return;
   }
   if (t.id === 'masiva-archivo') {
@@ -1390,7 +1444,7 @@ const SUB = {
     ui.cargando = true; ui.err = null; ui.aviso = ''; pintar();
     let r; try { r = await srv.ingresar(rutTxt, clave); } catch (e) { r = { error: 'No pudimos revisar la clave. Intenta de nuevo.' }; }
     ui.cargando = false;
-    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.ok) { escribirLS(LS_RUT, rutBonito(r.rut)); entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
     if (r.paso === 'crear') { ui.paso = 'crear'; ui.ticket = r.ticket; ui.crearPara = { rut: r.rut, nombre: r.nombre }; ui.form = {}; ui.foco = 'nueva'; pintar(); return; }
     ui.form.clave = ''; falla(r.campo, r.error);
   },
@@ -1399,7 +1453,7 @@ const SUB = {
     ui.cargando = true; ui.err = null; pintar();
     let r; try { r = await srv.crearClave(ui.ticket, val('nueva'), val('repite'), val('contacto')); } catch (e) { r = { error: 'No pudimos guardar la clave. Intenta de nuevo.' }; }
     ui.cargando = false;
-    if (r.ok) { entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
+    if (r.ok) { escribirLS(LS_RUT, rutBonito(r.rut)); entrar({ rol: 'cliente', rut: r.rut, token: r.token }, 'Clave creada. Bienvenido, ' + s.remutyme[r.rut].nombre); return; }
     if (r.reiniciar) { ui.paso = 'rut'; ui.form = {}; }
     if (r.campo === 'nueva' || r.campo === 'repite') { ui.form.repite = ''; }
     falla(r.campo, r.error);
@@ -1422,7 +1476,7 @@ const SUB = {
     }
     const r = leerCampos(ui.tipo); if (r.campo) return falla(r.campo, r.msg);
     if (def.sinTrabajador) trabajador = r.datos.nombre;
-    const a = def.adj && ui.archivo ? { nombre: ui.archivo.nombre, kb: ui.archivo.kb, mime: ui.archivo.mime } : null;
+    const a = def.adj && ui.archivo ? { nombre: ui.archivo.nombre, kb: ui.archivo.kb, mime: ui.archivo.mime, enDrive: !!(ui.archivo.enDrive && !ui.archivo.file) } : null;
     const repetida = d.mes.novedades.some(x => x.id !== ui.editando && x.trabajador === trabajador && x.tipo === ui.tipo);
     const res = srv.cli.guardarNovedad({ trabajador, tipo: ui.tipo, datos: r.datos, comentario: String(val('comentario')).trim(), adjunto: a }, ui.editando);
     if (res.error) return falla(null, res.error);
@@ -1453,7 +1507,18 @@ function aplicarTema() { const t = leerLS(LS_TEMA); if (t === 'light' || t === '
 /* ---------- Arranque ---------- */
 aplicarTema();
 listo = (window.crypto && crypto.subtle ? prepararSemillas() : Promise.resolve()).catch(() => {});
+if (!sesion && val('rut')) ui.foco = 'clave'; // RUT recordado: el cursor queda listo en la clave
 pintar();
+window.addEventListener('beforeunload', ev => { if (ui.enviando) { ev.preventDefault(); ev.returnValue = ''; } }); // avisa si cierran a medio envío
+if (REMOTO) {
+  /* Rapidez al abrir: el teléfono abre la conexión con Google y despierta al servidor (que deja las hojas en caché)
+     mientras la persona escribe RUT y clave. No manda datos; si no hay internet no pasa nada. */
+  ['https://script.google.com', 'https://script.googleusercontent.com'].forEach(h => { const l = document.createElement('link'); l.rel = 'preconnect'; l.href = h; l.crossOrigin = 'anonymous'; document.head.appendChild(l); });
+  let calentado = 0;
+  const calentar = () => { if (Date.now() - calentado < 4 * 60e3 || navigator.onLine === false) return; calentado = Date.now(); fetch(CONFIG.servidor + '?calentar=1', { mode: 'no-cors', cache: 'no-store' }).catch(() => {}); };
+  calentar();
+  document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') calentar(); });
+}
 if (REMOTO && sesion && sesion.token) {
   (sesion.rol === 'admin' ? cargarAdmin() : api('cli-datos').then(r => { if (r.ok) cargarCliente(r.datos); })).then(() => { if (sesion) pintar(); });
 }
