@@ -22,9 +22,9 @@ var DIAS_RECORDAR = 30;                 // «Recuérdame en este dispositivo»
 var MAX_ARCHIVO_MB = 8;
 var HOJAS = {
   Empresas: ['rut', 'nombre', 'correoEncargada', 'habilitada', 'hash', 'sal', 'intentos', 'contacto', 'pideReset', 'actualizada'],
-  Trabajadores: ['rut', 'nombre'],
+  Trabajadores: ['rut', 'nombre', 'rutTrabajador', 'baja'],   // baja = último período en que aparece (término)
   Envios: ['id', 'periodo', 'rut', 'empresa', 'fecha', 'cantidad', 'sinNovedades', 'estado', 'nota', 'carpeta'],
-  Novedades: ['envioId', 'periodo', 'rut', 'trabajador', 'tipo', 'detalle', 'comentario', 'respaldo', 'respaldoUrl', 'datos'],
+  Novedades: ['envioId', 'periodo', 'rut', 'trabajador', 'tipo', 'detalle', 'comentario', 'respaldo', 'respaldoUrl', 'datos', 'rutTrabajador'],
   Actividad: ['fecha', 'rut', 'tipo', 'texto']
 };
 
@@ -141,6 +141,14 @@ function filas(n) {
 function escribir(n, o) { hoja(n).getRange(o._fila, 1, 1, HOJAS[n].length).setValues([HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })]); cambio(n); }
 function agregar(n, o) { hoja(n).appendRow(HOJAS[n].map(function (c) { return o[c] === undefined ? '' : o[c]; })); cambio(n); }
 /* Varias filas en una sola escritura (antes, una llamada a la planilla por novedad). Solo dentro de conCandado. */
+function asegurarCabecera(n) {
+  var c = cache(), k = 'cab:' + n + ':' + HOJAS[n].length; if (c.get(k)) return;
+  try { // solo cosmético: nunca debe impedir un envío
+    var h = hoja(n), v = h.getRange(1, 1, 1, HOJAS[n].length).getValues()[0];
+    if (v.join('|') !== HOJAS[n].join('|')) h.getRange(1, 1, 1, HOJAS[n].length).setValues([HOJAS[n]]).setFontWeight('bold');
+    c.put(k, '1', 21600);
+  } catch (err) { console.error(err); }
+}
 function agregarVarias(n, lista) {
   if (!lista.length) return;
   var h = hoja(n), m = lista.map(function (o) { return HOJAS[n].map(function (c) { var v = o[c] === undefined ? '' : o[c]; return typeof v === 'string' && /^[=+\-@]/.test(v) ? "'" + v : v; }); }); // = + - @ al inicio: queda como texto, nunca como fórmula
@@ -250,7 +258,7 @@ function htmlCorreo(m) {
     x += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px;font-size:14px">' +
       '<tr><th style="' + th + '">Trabajador</th><th style="' + th + '">Novedad</th><th style="' + th + '">Detalle</th></tr>';
     m.tabla.forEach(function (n) {
-      x += '<tr><td style="' + td + ';font-weight:bold">' + hx(n.trabajador) + '</td><td style="' + td + '">' + hx(n.tipo) + '</td><td style="' + td + '">' + hx(n.detalle) +
+      x += '<tr><td style="' + td + ';font-weight:bold">' + hx(n.trabajador) + (n.rutTrabajador ? '<div style="font-size:12px;font-weight:normal;color:' + GRIS + '">' + rutPuntos(n.rutTrabajador) + '</div>' : '') + '</td><td style="' + td + '">' + hx(n.tipo) + '</td><td style="' + td + '">' + hx(n.detalle) +
         (n.comentario ? '<div style="color:' + GRIS + ';font-style:italic;margin-top:4px">«' + hx(n.comentario) + '»</div>' : '') +
         (n.url ? '<div style="margin-top:4px"><a href="' + hx(n.url) + '" style="color:' + V + '">📎 ' + hx(n.respaldo || 'Ver respaldo') + '</a></div>' : '') + '</td></tr>';
     });
@@ -304,11 +312,17 @@ function mesDe(rut, periodo, conUrls) {
   return { enviado: e.fecha, revisado: e.estado === 'revisada' || e.estado === 'ingresada', ingresado: e.estado === 'ingresada',
     nota: null, novedades: nov, sinNovedades: siNo(e.sinNovedades), carpeta: conUrls ? e.carpeta : undefined };
 }
-function trabajadoresDe(rut) { return filas('Trabajadores').filter(function (x) { return x.rut === rut; }).map(function (x) { return x.nombre; }); }
+function trabajadorVigente(x, periodo) { return !(x.baja && periodo && periodo > String(x.baja)); }
+function trabajadoresDe(rut, periodo) {
+  var vistos = {}, out = [];
+  filas('Trabajadores').forEach(function (x) { if (x.rut === rut && trabajadorVigente(x, periodo) && !vistos[x.nombre]) { vistos[x.nombre] = 1; out.push(x.nombre); } });
+  return out;
+}
+function rutsTrabajadores(rut) { var m = {}; filas('Trabajadores').forEach(function (x) { if (x.rut === rut && x.rutTrabajador) m[x.nombre] = x.rutTrabajador; }); return m; }
 function datosCliente(rut, periodo) {
   precargar(['Empresas', 'Trabajadores', 'Envios', 'Novedades']);
   var e = empresa(rut);
-  return { rut: rut, nombre: e.nombre, contacto: e.contacto, trabajadores: trabajadoresDe(rut), mes: periodoOk(periodo) ? mesDe(rut, periodo, false) : null };
+  return { rut: rut, nombre: e.nombre, contacto: e.contacto, trabajadores: trabajadoresDe(rut, periodo), mes: periodoOk(periodo) ? mesDe(rut, periodo, false) : null };
 }
 function claveDebil(clave, rut) {
   var k = clave.toLowerCase(), ini = prop('CLAVE_INICIAL').toLowerCase();
@@ -435,18 +449,23 @@ var ACCIONES = {
         for (var k = 0; k < fl.length; k++) { var fin = fl[k], ini = fin; while (k + 1 < fl.length && fl[k + 1] === ini - 1) { ini--; k++; } h.deleteRows(ini, fin - ini + 1); }
         cambio('Novedades');
       }
-      var conocidos = trabajadoresDe(s.rut), lineas = [], filasNov = [], nuevos = [], paraApp = [];
+      asegurarCabecera('Trabajadores'); asegurarCabecera('Novedades');
+      var conocidos = trabajadoresDe(s.rut), rutsT = rutsTrabajadores(s.rut), lineas = [], filasNov = [], nuevos = [], paraApp = [], bajas = [];
       lista.forEach(function (n, i) {
         var trab = String(n.trabajador || '').slice(0, 120), nomAdj = n.adjunto ? String(n.adjunto.nombre || '') : '', adj = urls[i] || (nomAdj && enDrive[nomAdj] ? { nombre: nomAdj, url: enDrive[nomAdj] } : null), det = String(n.detalle || '').slice(0, 300), com = String(n.comentario || '').slice(0, 500);
         var respaldo = adj ? adj.nombre : (n.adjunto ? n.adjunto.nombre + ' (no llegó el archivo)' : ''), datosTxt = JSON.stringify(n.datos || {}).slice(0, 2000), d = {};
+        var rutT = rutsT[trab] || '';
+        if (n.tipo === 'Ingreso' && n.datos && n.datos.rut) { var rI = normRut(n.datos.rut); if (rI && dvValido(rI)) rutT = rI; }
         filasNov.push({ envioId: id, periodo: q.periodo, rut: s.rut, trabajador: trab, tipo: String(n.tipo || '').slice(0, 40),
-          detalle: det, comentario: com, respaldo: respaldo, respaldoUrl: adj ? adj.url : '', datos: datosTxt });
-        if (trab && n.trabajadorNuevo && conocidos.indexOf(trab) < 0) { nuevos.push({ rut: s.rut, nombre: trab }); conocidos.push(trab); }
-        lineas.push({ trabajador: trab, nueva: agrego && !!n.nueva, tipo: (agrego && n.nueva ? '🆕 ' : '') + String(n.tipo || ''), detalle: String(n.detalle || ''), comentario: String(n.comentario || ''), respaldo: adj ? adj.nombre : '', url: adj ? adj.url : '' });
+          detalle: det, comentario: com, respaldo: respaldo, respaldoUrl: adj ? adj.url : '', datos: datosTxt, rutTrabajador: rutT });
+        if (trab && (n.trabajadorNuevo || n.tipo === 'Ingreso') && conocidos.indexOf(trab) < 0) { nuevos.push({ rut: s.rut, nombre: trab, rutTrabajador: rutT, baja: '' }); conocidos.push(trab); }
+        if (trab && n.tipo === 'Término') bajas.push(trab);
+        lineas.push({ rutTrabajador: rutT, trabajador: trab, nueva: agrego && !!n.nueva, tipo: (agrego && n.nueva ? '🆕 ' : '') + String(n.tipo || ''), detalle: String(n.detalle || ''), comentario: String(n.comentario || ''), respaldo: adj ? adj.nombre : '', url: adj ? adj.url : '' });
         try { d = JSON.parse(datosTxt); } catch (err) {}
         paraApp.push({ trabajador: trab, tipo: String(n.tipo || '').slice(0, 40), detalle: det, comentario: com, datos: d, adjunto: respaldo ? { nombre: respaldo } : null });
       });
       agregarVarias('Novedades', filasNov); agregarVarias('Trabajadores', nuevos);
+      if (bajas.length) filas('Trabajadores').forEach(function (x) { if (x.rut === s.rut && bajas.indexOf(x.nombre) >= 0 && !x.baja) { x.baja = q.periodo; escribir('Trabajadores', x); } });
       var env = { id: id, periodo: q.periodo, rut: s.rut, empresa: e.nombre, fecha: ahora(), cantidad: lista.length, sinNovedades: !lista.length, estado: 'enviado', nota: '', carpeta: car ? car.getUrl() : (previo && previo.carpeta) || '' };
       if (previo) { env._fila = previo._fila; escribir('Envios', env); } else agregar('Envios', env);
       var cuantas = lista.length ? lista.length + (lista.length === 1 ? ' novedad' : ' novedades') : 'sin novedades';
@@ -519,7 +538,7 @@ var ACCIONES = {
     var empresas = filas('Empresas').map(function (e) {
       return { rut: e.rut, nombre: e.nombre, correoEncargada: e.correoEncargada, habilitada: siNo(e.habilitada), registrada: !!e.hash,
         intentos: Number(e.intentos || 0), contacto: e.contacto, pideReset: siNo(e.pideReset),
-        trabajadores: trab.filter(function (t) { return t.rut === e.rut; }).map(function (t) { return t.nombre; }) };
+        trabajadores: trab.filter(function (t) { return t.rut === e.rut && trabajadorVigente(t, per); }).map(function (t) { return t.nombre; }) };
     });
     var meses = {};
     envios.forEach(function (x) { meses[x.rut] = mesDe(x.rut, per, true); if (x.estado === 'reabierto') meses[x.rut].nota = x.nota; });
@@ -542,6 +561,29 @@ var ACCIONES = {
       });
     });
     return { ok: true, n: n };
+  },
+
+  /* Carga masiva de trabajadores: [{ rut (empresa), nombre, rutTrabajador }]. Si ya existe (mismo RUT de trabajador, o
+     mismo nombre sin RUT) se actualiza y vuelve a quedar vigente; si no, se agrega. */
+  'adm-trabajadores': function (q) {
+    var s = sesionDe(q, 'admin'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
+    var lista = Array.isArray(q.trabajadores) ? q.trabajadores.slice(0, 5000) : [], nuevos = 0, actualizados = 0, malos = 0;
+    conCandado(function () {
+      asegurarCabecera('Trabajadores');
+      var empresas = {}; filas('Empresas').forEach(function (e) { empresas[e.rut] = e.nombre; });
+      var todas = filas('Trabajadores'), agregar = [], porEmpresa = {};
+      lista.forEach(function (x) {
+        var rut = normRut(x.rut), rt = normRut(x.rutTrabajador), nom = String(x.nombre || '').trim().replace(/\s+/g, ' ').slice(0, 120);
+        if (!rut || !empresas[rut] || !rt || !dvValido(rt) || nom.length < 3) { malos++; return; }
+        var e = todas.filter(function (y) { return y.rut === rut && (y.rutTrabajador === rt || (!y.rutTrabajador && String(y.nombre).toLowerCase() === nom.toLowerCase())); })[0];
+        if (e) { e.nombre = nom; e.rutTrabajador = rt; e.baja = ''; escribir('Trabajadores', e); actualizados++; }
+        else if (!agregar.some(function (y) { return y.rut === rut && y.rutTrabajador === rt; })) { agregar.push({ rut: rut, nombre: nom, rutTrabajador: rt, baja: '' }); nuevos++; }
+        porEmpresa[rut] = (porEmpresa[rut] || 0) + 1;
+      });
+      agregarVarias('Trabajadores', agregar);
+      Object.keys(porEmpresa).forEach(function (r) { registrar(r, 'accion', empresas[r] + ': ' + porEmpresa[r] + ' trabajadores cargados por ' + s.correo + '.'); });
+    });
+    return { ok: true, nuevos: nuevos, actualizados: actualizados, malos: malos };
   },
 
   'adm-bloqueo': function (q) { return conEmpresaAdm(q, function (e, s) { e.habilitada = !!q.habilitada; registrar(e.rut, 'seguridad', e.nombre + ': acceso ' + (e.habilitada ? 'habilitado' : 'bloqueado') + ' por ' + s.correo + '.'); }); },

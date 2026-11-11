@@ -262,7 +262,7 @@ dialog::backdrop { background: rgba(10, 20, 19, .55); }
 <script>
 (() => {
 'use strict';
-const VERSION_APP = 16; // subir junto con VERSION de sw.js en cada mejora
+const VERSION_APP = 17; // subir junto con VERSION de sw.js en cada mejora
 /* =============================================================================
    NOVEDADES CONTYME · DEMO
    Todo este archivo es PÚBLICO (va a GitHub). Por eso:
@@ -761,6 +761,32 @@ const srv = {
       });
       return r;
     },
+    /* Trabajadores: «RUT empresa; Nombre; RUT trabajador» (pegado desde Excel o CSV). */
+    analizarTrabajadores(texto) {
+      soyAdmin();
+      const r = { ok: [], malos: [], porEmpresa: {}, repetidos: 0 }, vistos = new Set();
+      String(texto).split(/\r?\n/).forEach((linea, i) => {
+        if (!linea.trim()) return;
+        const celdas = (/[;\t]/.test(linea) ? linea.split(/[;\t]/) : linea.split(',')).map(x => x.trim().replace(/^"|"$/g, '')).filter(Boolean);
+        const ruts = celdas.filter(x => /\d/.test(x) && normRut(x) && dvValido(normRut(x))).map(normRut);
+        const nombre = celdas.find(x => /[a-záéíóúñ]/i.test(x) && !/\d{5}/.test(x));
+        if (!ruts.length) { if (i > 0) r.malos.push('Línea ' + (i + 1) + ': no tiene RUT válidos.'); return; }
+        if (ruts.length < 2) { r.malos.push('Línea ' + (i + 1) + ': falta el RUT de la empresa o el del trabajador (RUT empresa; nombre; RUT trabajador).'); return; }
+        const [emp, rt] = ruts;
+        if (!s.remutyme[emp]) { r.malos.push('Línea ' + (i + 1) + ': la empresa ' + rutBonito(emp) + ' no está habilitada en la app.'); return; }
+        if (!nombre || nombre.length < 3) { r.malos.push('Línea ' + (i + 1) + ': falta el nombre del trabajador.'); return; }
+        if (vistos.has(emp + '|' + rt)) { r.repetidos++; return; } vistos.add(emp + '|' + rt);
+        r.ok.push({ rut: emp, nombre: nombre.replace(/\s+/g, ' ').slice(0, 120), rutTrabajador: rt });
+        r.porEmpresa[emp] = (r.porEmpresa[emp] || 0) + 1;
+      });
+      return r;
+    },
+    aplicarTrabajadores(lista) {
+      soyAdmin();
+      remoto('adm-trabajadores', { trabajadores: lista });
+      lista.forEach(x => { const e = s.remutyme[x.rut]; if (e && !e.trabajadores.includes(x.nombre)) e.trabajadores.push(x.nombre); });
+      registrar(null, 'accion', lista.length + ' trabajadores cargados.'); guardar(); return lista.length;
+    },
     aplicarCarga(ruts, datos) {
       soyAdmin(); let n = 0;
       remoto('adm-habilitar', { empresas: ruts.map(rut => s.remutyme[rut] ? { rut, nombre: s.remutyme[rut].nombre, correo: datos && datos[rut] ? datos[rut].correoRrhh : '' } : { rut, nombre: datos[rut].nombre, correo: datos[rut].correoRrhh }) });
@@ -1094,7 +1120,7 @@ function admEmpresas() {
     if (lnk && !c.hash && c.habilitada && c.intentos < CONFIG.maxIntentos) acc.push('<button type="button" class="btn btn-sec btn-chico" data-a="enviar-link" data-v="' + r + '">' + (c.link ? 'Reenviar link' : 'Enviar link') + '</button>');
     if (CONFIG.demo && lnk && c.link) acc.push('<button type="button" class="btn-link" data-a="abrir-link" data-v="' + r + '">Abrir link (demo)</button>');
     acc.push('<button type="button" class="btn btn-sec btn-chico" data-a="bloqueo" data-v="' + r + '">' + (c.habilitada ? 'Bloquear' : 'Habilitar') + '</button>');
-    return '<tr><td data-l="Empresa"><b>' + esc(s.remutyme[r].nombre) + '</b><div class="sub mono">' + rutBonito(r) + ' · ' + esc(s.remutyme[r].cartera) + '</div></td>' +
+    return '<tr><td data-l="Empresa"><b>' + esc(s.remutyme[r].nombre) + '</b><div class="sub mono">' + rutBonito(r) + ' · ' + esc(s.remutyme[r].cartera) + '</div><div class="sub">' + plural((s.remutyme[r].trabajadores || []).length, 'trabajador', 'trabajadores') + '</div></td>' +
       '<td data-l="Acceso"><span class="pill ' + e[1] + '">' + e[0] + '</span>' + (c.pideReset ? ' <span class="pill p-info">Pidió restablecer</span>' : '') +
       (c.link && !c.hash ? '<div class="sub">Vence ' + esc(fmtHora(c.link.vence)) + '</div>' : '') + '</td>' +
       '<td data-l="Correo de contacto">' + (c.correo ? esc(c.correo) : '<span class="sub">—</span>') + '</td><td data-l="Acciones"><div class="acciones" style="gap:6px">' + acc.join('') + '</div></td></tr>';
@@ -1120,7 +1146,22 @@ function admEmpresas() {
     '<p class="sub">Una empresa por línea: <b>RUT; nombre de la empresa; correo de la encargada en Contyme</b> (a ese correo llegan sus novedades). Sirve pegar las columnas desde Excel o subir un CSV. Antes de habilitar te mostramos qué va a pasar.</p>' +
     '<div class="campo"><label for="masiva">Empresas</label><textarea id="masiva" rows="6" placeholder="RUT; Nombre de la empresa; encargada@contyme.cl"' + aria('masiva') + '>' + esc(val('masiva')) + '</textarea>' + pieCampo('masiva') + '</div>' +
     '<div class="campo"><label for="masiva-archivo">O sube un archivo CSV</label><input id="masiva-archivo" type="file" accept=".csv,.txt,text/csv,text/plain"></div>' +
-    res + (ui.carga && ui.carga.listo == null ? '' : '<button type="submit" class="btn btn-pri">Revisar lista</button>') + '</form></div></div>';
+    res + (ui.carga && ui.carga.listo == null ? '' : '<button type="submit" class="btn btn-pri">Revisar lista</button>') + '</form>' + formTrabajadores() + '</div></div>';
+}
+function formTrabajadores() {
+  const k = ui.cargaTrab;
+  let res = '';
+  if (k && k.listo != null) res = '<div class="resultado" role="status"><b>' + plural(k.listo, 'trabajador cargado', 'trabajadores cargados') + '.</b><span>Ya aparecen en «Tus trabajadores» de cada empresa.</span></div>';
+  else if (k) res = '<div class="resultado" role="status"><b>Revisión de la lista</b>' +
+    (k.ok.length ? '<div>Se cargarán ' + plural(k.ok.length, 'trabajador', 'trabajadores') + ':<ul>' + Object.keys(k.porEmpresa).map(r => '<li>' + esc(s.remutyme[r].nombre) + ': ' + plural(k.porEmpresa[r], 'trabajador', 'trabajadores') + '</li>').join('') + '</ul></div>' : '<div>No hay trabajadores válidos para cargar.</div>') +
+    (k.repetidos ? '<div class="sub">' + plural(k.repetidos, 'línea repetida (se cuenta una vez)', 'líneas repetidas (se cuentan una vez)') + '.</div>' : '') +
+    (k.malos.length ? '<div class="malos">Con problemas (no se cargan):<ul>' + k.malos.slice(0, 30).map(x => '<li>' + esc(x) + '</li>').join('') + (k.malos.length > 30 ? '<li>… y ' + (k.malos.length - 30) + ' más</li>' : '') + '</ul></div>' : '') +
+    (k.ok.length ? '<button type="button" class="btn btn-pri" data-a="aplicar-trab">Cargar ' + plural(k.ok.length, 'trabajador', 'trabajadores') + '</button>' : '') +
+    '<button type="button" class="btn-link" data-a="cancelar-trab">Cancelar</button></div>';
+  return '<form id="f-trab" class="caja" novalidate style="margin-top:16px"><h2 style="font-size:17px">Cargar trabajadores (masivo)</h2>' +
+    '<p class="sub">Uno por línea: <b>RUT de la empresa; nombre del trabajador; RUT del trabajador</b>. Pega las columnas desde Excel. Si el trabajador ya estaba, se actualiza. El cliente ve solo los nombres; el RUT queda para Contyme.</p>' +
+    '<div class="campo"><label for="masiva-trab">Trabajadores</label><textarea id="masiva-trab" rows="6" placeholder="76.123.456-7; Ana Soto Rivas; 12.345.678-5"' + aria('masiva-trab') + '>' + esc(val('masiva-trab')) + '</textarea>' + pieCampo('masiva-trab') + '</div>' +
+    res + (k && k.listo == null ? '' : '<button type="submit" class="btn btn-pri">Revisar lista</button>') + '</form>';
 }
 function admActividad() {
   const tipos = { todo: 'Todo', correo: REMOTO ? 'Correos' : 'Correos (simulados)', seguridad: 'Seguridad', accion: 'Acciones' };
@@ -1360,7 +1401,7 @@ const ACC = {
     });
   },
   pdf: v => toast('Demo: en la app real aquí se descarga el PDF de ' + v + '.'),
-  adm: v => { ui.admTab = v; ui.err = null; ui.carga = null; ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); },
+  adm: v => { ui.admTab = v; ui.err = null; ui.carga = null; ui.cargaTrab = null; ui.foco = 'titulo'; pintar(); window.scrollTo(0, 0); },
   filtro: v => { ui.filtro = v; pintar(); },
   'limpiar-filtro': () => { ui.filtro = 'todas'; ui.buscar = ''; ui.foco = 'buscar'; pintar(); },
   sel: v => { ui.sel = v; ui.foco = 'det-titulo'; pintar(); },
@@ -1394,6 +1435,8 @@ const ACC = {
       accion: () => { srv.adm.alternarBloqueo(v); pintar(); toast(nom + ': acceso bloqueado'); } });
   },
   'aplicar-carga': () => { const n = srv.adm.aplicarCarga(ui.carga.nuevas.concat(ui.carga.cambios || []), ui.carga.datos); ui.carga = { listo: n }; ui.form.masiva = ''; pintar(); toast(plural(n, 'empresa lista', 'empresas listas')); },
+  'aplicar-trab': () => { const n = srv.adm.aplicarTrabajadores(ui.cargaTrab.ok); ui.cargaTrab = { listo: n }; ui.form['masiva-trab'] = ''; pintar(); toast(plural(n, 'trabajador cargado', 'trabajadores cargados')); },
+  'cancelar-trab': () => { ui.cargaTrab = null; ui.foco = 'masiva-trab'; pintar(); },
   'cancelar-carga': () => { ui.carga = null; ui.foco = 'masiva'; pintar(); },
   'act-filtro': v => { ui.actFiltro = v; pintar(); },
   activacion: v => { srv.adm.cambiarActivacion(v); pintar(); toast('Modo de la demo: ' + (v === 'link' ? 'link de un solo uso' : 'clave inicial')); },
@@ -1568,6 +1611,13 @@ const SUB = {
     const editado = ui.editando != null;
     ir('mes');
     toast(repetida ? 'Guardada. Ojo: ' + trabajador + ' ya tenía otra novedad de ese tipo; revisa que no esté repetida.' : editado ? 'Cambios guardados' : 'Novedad guardada. Falta enviar a Contyme.');
+  },
+  'f-trab': () => {
+    const texto = val('masiva-trab');
+    if (!texto.trim()) return falla('masiva-trab', 'Pega al menos una línea: RUT empresa; nombre; RUT trabajador.');
+    if (texto.split(/\r?\n/).length > 5000) return falla('masiva-trab', 'Son demasiadas líneas. Carga hasta 5.000 por vez.');
+    ui.cargaTrab = srv.adm.analizarTrabajadores(texto); ui.err = null; ui.foco = null; pintar();
+    const btn = document.querySelector('[data-a="aplicar-trab"]') || document.querySelector('[data-a="cancelar-trab"]'); if (btn) btn.focus();
   },
   'f-masiva': () => {
     const texto = val('masiva');
