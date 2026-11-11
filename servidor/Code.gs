@@ -12,6 +12,7 @@
  *   (SHEET_ID y CARPETA_ID los completa instalar())
  */
 
+var APP_URL = 'https://ielgueta-spec.github.io/novedades-contyme-demo/'; // link de los botones de los correos
 var DOMINIO_ENCARGADAS = 'contyme.cl';   // los avisos de envíos solo van a correos de este dominio
 var MAX_INTENTOS = 5;
 var ITERACIONES = 2000;                   // vueltas del hash de las claves
@@ -102,11 +103,72 @@ function sesionDe(q, rol) {
 }
 function nuevaSesion(datos, horas) { var t = azar(); cache().put('t:' + t, JSON.stringify(datos), horas * 3600); return t; }
 function registrar(rut, tipo, texto) { agregar('Actividad', { fecha: ahora(), rut: rut || '', tipo: tipo, texto: String(texto).slice(0, 500) }); }
-function correo(para, asunto, cuerpo) {
-  if (!para || !RE_CORREO.test(para)) return false;
-  MailApp.sendEmail({ to: para, subject: asunto, body: cuerpo + '\n\n—\nNovedades Contyme · mensaje automático, no respondas este correo.', name: 'Novedades Contyme' });
+/**
+ * Manda un correo con versión HTML (diseño Contyme) y versión de texto.
+ * para: uno o varios correos separados por coma. m: { titulo, intro, filas, tabla, nota, boton: {txt, url}, boton2, responderA }
+ */
+function correo(para, asunto, m) {
+  var lista = String(para || '').split(',').map(function (x) { return x.trim(); }).filter(function (x) { return RE_CORREO.test(x); });
+  if (!lista.length) return false;
+  if (typeof m === 'string') m = { intro: m };
+  var o = { to: lista.join(','), subject: asunto, name: 'Novedades Contyme', body: textoCorreo(m), htmlBody: htmlCorreo(m) };
+  if (m.responderA && RE_CORREO.test(m.responderA)) o.replyTo = m.responderA;
+  MailApp.sendEmail(o);
   return true;
 }
+function hx(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function textoCorreo(m) {
+  var t = [];
+  if (m.titulo) t.push(m.titulo, '');
+  if (m.intro) t.push(m.intro, '');
+  (m.filas || []).forEach(function (f) { t.push(f[0] + ': ' + f[1]); });
+  if (m.filas && m.filas.length) t.push('');
+  if (m.tabla && m.tabla.length) {
+    m.tabla.forEach(function (n) { t.push('• ' + n.trabajador + ' — ' + n.tipo + ': ' + n.detalle + (n.comentario ? ' («' + n.comentario + '»)' : '') + (n.url ? ' [respaldo: ' + n.url + ']' : '')); });
+    t.push('');
+  }
+  if (m.nota) t.push(m.nota, '');
+  if (m.boton) t.push(m.boton.txt + ': ' + m.boton.url);
+  if (m.boton2) t.push(m.boton2.txt + ': ' + m.boton2.url);
+  t.push('', '—', 'Novedades Contyme · Asesores · Auditores · Contables', m.responderA ? 'Si respondes este correo, le llega a tu encargada en Contyme.' : 'Mensaje automático.');
+  return t.join('\n');
+}
+function htmlCorreo(m) {
+  var V = '#0E7C7B', OSC = '#0B3B3A', GRIS = '#5B6B6A', BORDE = '#DCE6E5';
+  var x = '<div style="margin:0;padding:24px 12px;background:#F2F6F6;font-family:Arial,Helvetica,sans-serif;color:#1F2A2A">' +
+    '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;margin:0 auto;background:#fff;border:1px solid ' + BORDE + ';border-radius:12px;overflow:hidden">' +
+    '<tr><td style="background:' + V + ';padding:18px 24px;color:#fff"><div style="font-size:20px;font-weight:bold;letter-spacing:1px">CONTYME</div>' +
+    '<div style="font-size:12px;opacity:.85">Novedades de remuneraciones</div></td></tr><tr><td style="padding:24px">';
+  if (m.titulo) x += '<h1 style="margin:0 0 12px;font-size:20px;color:' + OSC + '">' + hx(m.titulo) + '</h1>';
+  if (m.intro) x += '<p style="margin:0 0 16px;font-size:15px;line-height:1.5">' + hx(m.intro).replace(/\n/g, '<br>') + '</p>';
+  if (m.filas && m.filas.length) {
+    x += '<table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 16px;font-size:14px">';
+    m.filas.forEach(function (f) { x += '<tr><td style="padding:3px 16px 3px 0;color:' + GRIS + '">' + hx(f[0]) + '</td><td style="padding:3px 0;font-weight:bold">' + hx(f[1]) + '</td></tr>'; });
+    x += '</table>';
+  }
+  if (m.tabla && m.tabla.length) {
+    var th = 'text-align:left;padding:8px;border-bottom:2px solid ' + V + ';font-size:12px;color:' + GRIS + ';text-transform:uppercase';
+    var td = 'padding:8px;border-bottom:1px solid ' + BORDE + ';vertical-align:top';
+    x += '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;margin:0 0 16px;font-size:14px">' +
+      '<tr><th style="' + th + '">Trabajador</th><th style="' + th + '">Novedad</th><th style="' + th + '">Detalle</th></tr>';
+    m.tabla.forEach(function (n) {
+      x += '<tr><td style="' + td + ';font-weight:bold">' + hx(n.trabajador) + '</td><td style="' + td + '">' + hx(n.tipo) + '</td><td style="' + td + '">' + hx(n.detalle) +
+        (n.comentario ? '<div style="color:' + GRIS + ';font-style:italic;margin-top:4px">«' + hx(n.comentario) + '»</div>' : '') +
+        (n.url ? '<div style="margin-top:4px"><a href="' + hx(n.url) + '" style="color:' + V + '">📎 ' + hx(n.respaldo || 'Ver respaldo') + '</a></div>' : '') + '</td></tr>';
+    });
+    x += '</table>';
+  }
+  if (m.nota) x += '<div style="margin:0 0 16px;padding:12px 14px;background:#EAF4F4;border-left:4px solid ' + V + ';border-radius:6px;font-size:14px;line-height:1.5">' + hx(m.nota).replace(/\n/g, '<br>') + '</div>';
+  [m.boton, m.boton2].forEach(function (b, i) {
+    if (!b) return;
+    x += '<a href="' + hx(b.url) + '" style="display:inline-block;margin:4px 8px 4px 0;padding:11px 20px;border-radius:8px;font-size:14px;font-weight:bold;text-decoration:none;' +
+      (i ? 'color:' + V + ';border:1px solid ' + V : 'background:' + V + ';color:#fff') + '">' + hx(b.txt) + '</a>';
+  });
+  x += '</td></tr><tr><td style="padding:14px 24px;background:#F7FAFA;border-top:1px solid ' + BORDE + ';font-size:12px;color:' + GRIS + '">CONTYME · Asesores · Auditores · Contables<br>' +
+    (m.responderA ? 'Si respondes este correo, le llega a tu encargada en Contyme.' : 'Mensaje automático de la app de Novedades.') + '</td></tr></table></div>';
+  return x;
+}
+function rutPuntos(r) { var p = String(r).split('-'); return p[0].replace(/\B(?=(\d{3})+(?!\d))/g, '.') + (p[1] ? '-' + p[1] : ''); }
 function deContyme(c) { return RE_CORREO.test(c || '') && String(c).toLowerCase().split('@')[1] === DOMINIO_ENCARGADAS; }
 function conCandado(fn) { var l = LockService.getScriptLock(); l.waitLock(20000); try { return fn(); } finally { l.releaseLock(); } }
 function empresa(rut) { return filas('Empresas').filter(function (x) { return x.rut === rut; })[0] || null; }
@@ -192,8 +254,11 @@ var ACCIONES = {
         e.pideReset = true; escribir('Empresas', e);
         registrar(rut, 'correo', e.nombre + ' pidió restablecer su clave.');
         var para = deContyme(e.correoEncargada) ? e.correoEncargada : admins()[0];
-        correo(para, 'Novedades · ' + e.nombre + ' pide restablecer su clave',
-          e.nombre + ' (' + rut + ') pidió restablecer la clave de la app de Novedades.\nEntra a la app como administrador → Empresas → «Restablecer clave».');
+        correo(para, 'Novedades · ' + e.nombre + ' pide restablecer su clave', {
+          titulo: e.nombre + ' pide restablecer su clave',
+          filas: [['Empresa', e.nombre], ['RUT', rutPuntos(rut)]],
+          nota: 'Entra a la app como administrador → Empresas → «Restablecer clave». Después avísale a la empresa por la vía de siempre (nunca mandes la clave por correo).',
+          boton: { txt: 'Abrir la app', url: APP_URL } });
       }
     });
     return { ok: true }; // misma respuesta siempre: no revela si el RUT es cliente
@@ -239,20 +304,31 @@ var ACCIONES = {
           detalle: String(n.detalle || '').slice(0, 300), comentario: String(n.comentario || '').slice(0, 500),
           respaldo: adj ? adj.nombre : (n.adjunto ? n.adjunto.nombre + ' (no llegó el archivo)' : ''), respaldoUrl: adj ? adj.url : '', datos: JSON.stringify(n.datos || {}).slice(0, 2000) });
         if (trab && n.trabajadorNuevo && conocidos.indexOf(trab) < 0) { agregar('Trabajadores', { rut: s.rut, nombre: trab }); conocidos.push(trab); }
-        lineas.push('• ' + trab + ' — ' + n.tipo + ': ' + (n.detalle || '') + (n.comentario ? ' («' + n.comentario + '»)' : '') + (adj ? ' [respaldo adjunto en la carpeta]' : ''));
+        lineas.push({ trabajador: trab, tipo: String(n.tipo || ''), detalle: String(n.detalle || ''), comentario: String(n.comentario || ''), respaldo: adj ? adj.nombre : '', url: adj ? adj.url : '' });
       });
       var env = { id: id, periodo: q.periodo, rut: s.rut, empresa: e.nombre, fecha: ahora(), cantidad: lista.length, sinNovedades: !lista.length, estado: 'enviado', nota: '', carpeta: car.getUrl() };
       if (previo) { env._fila = previo._fila; escribir('Envios', env); } else agregar('Envios', env);
       var cuantas = lista.length ? lista.length + (lista.length === 1 ? ' novedad' : ' novedades') : 'sin novedades';
       registrar(s.rut, 'accion', e.nombre + ' envió ' + cuantas + ' de ' + nombreMes(q.periodo) + '.');
       var para = deContyme(e.correoEncargada) ? e.correoEncargada : admins().join(',');
-      correo(para, 'Novedades de ' + nombreMes(q.periodo) + ' · ' + e.nombre + ' (' + cuantas + ')',
-        e.nombre + ' (' + s.rut + ') envió ' + cuantas + ' de ' + nombreMes(q.periodo) + (previo ? ' (corregidas)' : '') + '.\n\n' +
-        (lineas.length ? lineas.join('\n') + '\n\n' : 'Avisó que este mes no tuvo novedades.\n\n') +
-        (archivos.length ? 'Respaldos (carpeta privada en Drive): ' + car.getUrl() + '\n' : '') +
-        'Revisa y marca el avance en la app de Novedades (administración).');
-      if (e.contacto) correo(e.contacto, 'Recibimos tus novedades de ' + nombreMes(q.periodo),
-        'Hola,\n\nContyme recibió las novedades de ' + nombreMes(q.periodo) + ' de ' + e.nombre + ' (' + cuantas + ').\nPuedes ver en qué van entrando a la app.');
+      var mes = nombreMes(q.periodo), Mes = mes.charAt(0).toUpperCase() + mes.slice(1);
+      var sinEnc = !deContyme(e.correoEncargada);
+      correo(para, (previo ? '[Corregidas] ' : '') + 'Novedades ' + mes + ' · ' + e.nombre + ' (' + cuantas + ')', {
+        titulo: e.nombre + (previo ? ' corrigió sus novedades' : ' envió sus novedades'),
+        filas: [['Empresa', e.nombre], ['RUT', rutPuntos(s.rut)], ['Período', Mes], ['Novedades', lista.length ? String(lista.length) : 'Sin novedades este mes'], ['Enviado por', e.contacto || '—']],
+        tabla: lineas,
+        nota: (lista.length ? '' : 'La empresa avisó que este mes no hubo novedades: se repite la liquidación del mes anterior.\n') +
+          (sinEnc ? 'Esta empresa no tiene encargada @contyme.cl: el aviso llegó a los administradores. Asígnala en Empresas (carga masiva).' : ''),
+        boton: { txt: 'Abrir la bandeja', url: APP_URL },
+        boton2: archivos.length ? { txt: 'Ver respaldos en Drive', url: car.getUrl() } : null });
+      if (e.contacto) correo(e.contacto, 'Recibimos tus novedades de ' + mes + ' · ' + e.nombre, {
+        titulo: '¡Listo! Recibimos tus novedades',
+        intro: 'Contyme recibió las novedades de ' + mes + ' de ' + e.nombre + '. Este es el resumen de lo que enviaste:',
+        filas: [['Empresa', e.nombre], ['Período', Mes], ['Novedades', lista.length ? String(lista.length) : 'Sin novedades este mes']],
+        tabla: lineas.map(function (n) { return { trabajador: n.trabajador, tipo: n.tipo, detalle: n.detalle, comentario: n.comentario, respaldo: n.respaldo }; }),
+        nota: 'Si te faltó algo, responde este correo o escríbele a tu encargada y ella reabre tu envío.',
+        boton: { txt: 'Ver en qué va', url: APP_URL },
+        responderA: sinEnc ? '' : e.correoEncargada });
       registrar(s.rut, 'correo', 'Aviso a ' + para + ' y confirmación al cliente.');
       return { ok: true, datos: datosCliente(s.rut, q.periodo) };
     });
@@ -264,7 +340,10 @@ var ACCIONES = {
     if (admins().indexOf(c) >= 0) {
       var cod = String(Math.floor(100000 + Math.random() * 900000));
       cache().put('c:' + c, JSON.stringify({ cod: cod, n: 0 }), 600);
-      correo(c, 'Tu código para entrar a Novedades Contyme: ' + cod, 'Tu código es ' + cod + '. Vence en 10 minutos.\nSi no lo pediste, ignora este correo.');
+      correo(c, 'Tu código para entrar a Novedades Contyme: ' + cod, {
+        titulo: 'Tu código es ' + cod,
+        intro: 'Escríbelo en la app para entrar como administrador. Vence en 10 minutos.',
+        nota: 'Si no lo pediste, ignora este correo: nadie puede entrar sin el código.' });
     } else Utilities.sleep(400);
     return { ok: true }; // misma respuesta siempre
   },
@@ -327,16 +406,24 @@ var ACCIONES = {
     return conEnvioAdm(q, function (x, e, s) {
       x.estado = 'reabierto'; x.nota = String(q.nota || '').slice(0, 500);
       registrar(e.rut, 'correo', 'A ' + e.nombre + ': Contyme pidió revisar sus novedades (' + s.correo + ').');
-      correo(e.contacto, 'Contyme te pidió revisar tus novedades de ' + nombreMes(x.periodo),
-        'Hola,\n\nTu encargada en Contyme reabrió el envío de ' + nombreMes(x.periodo) + ' de ' + e.nombre + ' con este mensaje:\n\n«' + x.nota + '»\n\nEntra a la app, corrige y vuelve a enviar.');
+      correo(e.contacto, 'Revisa tus novedades de ' + nombreMes(x.periodo) + ' · ' + e.nombre, {
+        titulo: 'Te pedimos revisar tus novedades',
+        intro: 'Tu encargada en Contyme reabrió el envío de ' + nombreMes(x.periodo) + ' de ' + e.nombre + ' con este mensaje:',
+        nota: '«' + x.nota + '»',
+        boton: { txt: 'Corregir y volver a enviar', url: APP_URL },
+        responderA: deContyme(e.correoEncargada) ? e.correoEncargada : '' });
     });
   },
   'adm-recordar': function (q) {
     var s = sesionDe(q, 'admin'); if (!s) return { error: 'Tu sesión venció. Vuelve a entrar.', salir: true };
     var e = empresa(normRut(q.rut)); if (!e || !periodoOk(q.periodo)) return { error: 'Empresa no encontrada.' };
     var x = envioDe(e.rut, q.periodo); if (x && x.estado !== 'reabierto') return { ok: true };
-    var enviado = correo(e.contacto, 'Recuerda enviar tus novedades de ' + nombreMes(q.periodo),
-      'Hola,\n\nTe recordamos enviar a Contyme las novedades de ' + nombreMes(q.periodo) + ' de ' + e.nombre + (q.plazo ? ' antes del ' + q.plazo : '') + ', o avisar que no hubo novedades, desde la app de Novedades.');
+    var enviado = correo(e.contacto, 'Recuerda enviar tus novedades de ' + nombreMes(q.periodo) + ' · ' + e.nombre, {
+      titulo: 'Recuerda enviar tus novedades',
+      intro: 'Todavía no recibimos las novedades de ' + nombreMes(q.periodo) + ' de ' + e.nombre + (q.plazo ? '. El plazo es el ' + q.plazo : '') + '.',
+      nota: 'Horas extra, bonos, licencias médicas, vacaciones, ingresos y términos. Si no hubo cambios, basta con tocar «Este mes no hubo novedades».',
+      boton: { txt: 'Enviar mis novedades', url: APP_URL },
+      responderA: deContyme(e.correoEncargada) ? e.correoEncargada : '' });
     registrar(e.rut, 'correo', 'Recordatorio a ' + e.nombre + (enviado ? '' : ' (no tiene correo de contacto: no se envió)') + '.');
     return enviado ? { ok: true } : { error: e.nombre + ' todavía no tiene correo de contacto (se registra al crear su clave).' };
   }
